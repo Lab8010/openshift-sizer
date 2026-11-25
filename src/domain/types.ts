@@ -190,6 +190,8 @@ export interface SizingInput {
   backends: StorageBackendInput[];
   /** サンプル値を読み込んだ場合 true（画面と帳票に表示する） */
   isSample: boolean;
+  /** 簡易版などで追加する前提（結果の「このアプリの仮定」に表示） */
+  extraAssumptions?: string[];
 }
 
 let seq = 0;

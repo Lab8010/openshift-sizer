@@ -2,6 +2,9 @@ import type { SizingResult } from '../domain/result';
 import { DISCLAIMER, PRODUCT } from '../domain/sources';
 import { PATH_LABELS, PLACEMENT_LABELS, type Qty, type RoleKey, type SizingInput } from '../domain/types';
 import { AssumptionList, Legend, OpenItemsList, SectionView, SourcesList, SummaryTable } from './ResultParts';
+import type { SimpleInput } from '../domain/simple';
+import { SIMPLE_GROUP_IDS, type SimpleView } from '../domain/simpleView';
+import { SimpleTables, SimpleVerdict, simpleOpenItems } from './SimpleResults';
 
 const v = (raw: string) => (raw.trim() === '' ? '未入力' : raw);
 const q = (x: Qty<string>) => (x.raw.trim() === '' ? '未入力' : `${x.raw} ${x.unit}`);
@@ -13,12 +16,13 @@ function fmtDate(iso: string): string {
 
 const ROLE_LABEL: Record<RoleKey, string> = { controlPlane: 'コントロールプレーン', compute: 'コンピュート', infra: 'インフラ' };
 
-export function PrintReport({ input, result }: { input: SizingInput; result: SizingResult }) {
+export function PrintReport({ input, result, simple }: { input: SizingInput; result: SizingResult; simple?: { input: SimpleInput; view: SimpleView } }) {
+  if (simple) return <SimpleReport input={input} result={result} simple={simple} />;
   const backendName = (id: string) => input.backends.find((b) => b.id === id)?.name || '未指定';
   return (
     <article className="report" lang="ja">
       <header className="report-head">
-        <h1>OpenShift サイジングレポート</h1>
+        <h1>OpenShift サイジングレポート（詳細版）</h1>
         <table className="meta">
           <tbody>
             <tr>
@@ -318,6 +322,142 @@ export function PrintReport({ input, result }: { input: SizingInput; result: Siz
         <OpenItemsList result={result} />
       </section>
 
+      <section>
+        <h2>5. 出典一覧</h2>
+        <p className="small">すべて Red Hat の 4.22 版公式資料です。章節番号は各資料ページ内の番号です。</p>
+        <SourcesList result={result} />
+      </section>
+    </article>
+  );
+}
+
+function ReportHead({ input, result, title }: { input: SizingInput; result: SizingResult; title: string }) {
+  return (
+    <header className="report-head">
+      <h1>{title}</h1>
+      <table className="meta">
+        <tbody>
+          <tr>
+            <th scope="row">案件名</th>
+            <td>{input.cluster.projectName || '（未入力）'}</td>
+          </tr>
+          <tr>
+            <th scope="row">計算日時</th>
+            <td>{fmtDate(result.calculatedAt)}</td>
+          </tr>
+          <tr>
+            <th scope="row">製品バージョン</th>
+            <td>
+              {PRODUCT.ocp}／{PRODUCT.virt}
+            </td>
+          </tr>
+        </tbody>
+      </table>
+      <p className="disclaimer">
+        <strong>{DISCLAIMER.title}：</strong>
+        {DISCLAIMER.text}
+      </p>
+      {input.isSample && <p className="sample-note">※ 入力値はサンプル値です。公式値ではありません。</p>}
+      {result.inputErrorCount > 0 && <p className="sample-note">※ 入力エラーが {result.inputErrorCount} 件あります。該当項目は未算出として扱っています。</p>}
+    </header>
+  );
+}
+
+function SimpleReport({ input, result, simple }: { input: SizingInput; result: SizingResult; simple: { input: SimpleInput; view: SimpleView } }) {
+  const s = simple.input;
+  const filtered = simpleOpenItems(result);
+  return (
+    <article className="report" lang="ja">
+      <ReportHead input={input} result={result} title="OpenShift サイジングレポート（簡易版）" />
+      <section>
+        <h2>1. サイジング結果</h2>
+        <SimpleVerdict view={simple.view} />
+        <SimpleTables view={simple.view} />
+        <Legend />
+      </section>
+      <section>
+        <h2>2. 入力と前提</h2>
+        <h3>2.1 仮想マシン（ゲスト VM のスペック）</h3>
+        <table className="data input-table">
+          <thead>
+            <tr>
+              <th scope="col">名前</th>
+              <th scope="col">台数</th>
+              <th scope="col">vCPU／台</th>
+              <th scope="col">メモリ／台</th>
+              <th scope="col">ディスク／台</th>
+            </tr>
+          </thead>
+          <tbody>
+            {s.vms.map((x, i) => (
+              <tr key={x.id}>
+                <th scope="row">{x.name || `VM ${i + 1}`}</th>
+                <td>{v(x.count)}</td>
+                <td>{v(x.vcpu)}</td>
+                <td>{q(x.ram)}</td>
+                <td>{q(x.disk)}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+        <h3>2.2 VM 用の物理サーバとクラスタ構成</h3>
+        <table className="data input-table">
+          <tbody>
+            <tr>
+              <th scope="row">物理サーバ</th>
+              <td>
+                {v(s.servers.count)} 台、CPU {v(s.servers.cpu)} 論理コア／台、メモリ {q(s.servers.ram)}／台
+              </td>
+            </tr>
+            <tr>
+              <th scope="row">CPU 割り当て比率</th>
+              <td>{s.cpuRatio}:1</td>
+            </tr>
+            <tr>
+              <th scope="row">停止・メンテナンスを許容する台数</th>
+              <td>{s.tolerance} 台</td>
+            </tr>
+            <tr>
+              <th scope="row">インフラノード</th>
+              <td>{s.infra === 'separate' ? '別に 3 台用意する' : '使わない'}</td>
+            </tr>
+            <tr>
+              <th scope="row">Namespace 数</th>
+              <td>{v(s.namespaces)}</td>
+            </tr>
+            <tr>
+              <th scope="row">共有ストレージの物理容量係数</th>
+              <td>{v(s.storageFactor)}</td>
+            </tr>
+            <tr>
+              <th scope="row">簡易版の仮定値</th>
+              <td>
+                常駐 Pod {v(s.assumptions.residentCpu)} コア・{q(s.assumptions.residentMem)}／台、ハード Eviction しきい値 {q(s.assumptions.evictionMem)}
+              </td>
+            </tr>
+          </tbody>
+        </table>
+        <h3>2.3 前提と仮定</h3>
+        <AssumptionList result={result} />
+      </section>
+      <section>
+        <h2>3. 計算の内訳</h2>
+        {result.groups
+          .filter((g) => SIMPLE_GROUP_IDS.includes(g.id))
+          .map((g) => (
+            <div key={g.id} className="report-group">
+              <h3>{g.title}</h3>
+              {g.sections.map((sec) => (
+                <SectionView key={sec.id} section={sec} print />
+              ))}
+            </div>
+          ))}
+      </section>
+      <section>
+        <h2>4. 確認事項（{filtered.openItems.length} 件）</h2>
+        <p className="small">ネットワーク・ストレージ性能・監視などの確認項目は、詳細版で入力・確認できます。</p>
+        <OpenItemsList result={filtered} />
+      </section>
       <section>
         <h2>5. 出典一覧</h2>
         <p className="small">すべて Red Hat の 4.22 版公式資料です。章節番号は各資料ページ内の番号です。</p>

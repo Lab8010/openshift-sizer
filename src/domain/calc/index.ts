@@ -78,6 +78,28 @@ export function calculateSizing(input: SizingInput, now: Date = new Date()): Siz
     groups,
     openItems: openItems(groups),
     usedRefs: usedRefs(groups),
+    figures: {
+      computeRequired: compute.required,
+      computeRequiredStatus: compute.requiredStatus,
+      computeCandidate: compute.candidate,
+      computeCandidateStatus: compute.candidate !== null ? compute.candidateStatus : 'na',
+      computeUnavailable: has(model.roles.compute.unavailable) ? model.roles.compute.unavailable.v : null,
+      vmCpuPerNode: compute.vmCpuPerNode,
+      vmMemPerNodeMiB: compute.vmMemPerNodeMiB,
+      totalCpuDemand: compute.totalCpuDemand,
+      totalMemDemandMiB: compute.totalMemDemandMiB,
+      cpPerNodeCpu: cp.perNodeCpu,
+      cpPerNodeMemGB: cp.perNodeMemGB,
+      cpRowStatus: cp.rowStatus,
+      cpRowId: cp.row?.id ?? null,
+      infraEnabled: infra.enabled,
+      infraRowStatus: infra.rowStatus,
+      infraRowId: infra.row?.id ?? null,
+      infraPerNodeGuideCpu: infra.perNodeGuideCpu,
+      infraPerNodeGuideMemMiB: infra.perNodeGuideMemMiB,
+      vmLogicalBytes: storage.vmLogicalBytes,
+      physicalBytes: storage.physicalTotalBytes,
+    },
   };
   return { result, errors, model };
 }
@@ -125,6 +147,7 @@ function platformSection(model: SizingModel): Section {
 function assumptions(model: SizingModel, used1to1: boolean): Assumption[] {
   const out: Assumption[] = [];
   if (model.isSample) out.push({ kind: 'sample', text: '入力値はサンプル値です。実案件の値に置き換えてください。' });
+  model.extraAssumptions.forEach((text) => out.push({ kind: 'assumption', text }));
   model.vms.filter((v) => v.runningLinked).forEach((v) => out.push({ kind: 'assumption', text: `VM「${v.name}」の最大同時稼働台数は、初期値として定義台数と同数（${has(v.defined) ? fmt(v.defined.v) : '未入力'} 台）を設定しています。` }));
   out.push({ kind: 'assumption', text: 'VM プロファイルの新規行では、グラフィックスデバイス 1、SR-IOV 0、GPU 0、SEV・TPM 無効を初期値として表示しています（画面で変更できます）。' });
   out.push({ kind: 'assumption', text: 'メモリのオーバーコミットは前提としません。VM メモリ要求量 = ゲスト RAM + VM 追加メモリ。' });
@@ -266,6 +289,7 @@ function openItems(groups: SizingResult['groups']): OpenItem[] {
         if (seen.has(key)) continue;
         seen.add(key);
         out.push({
+          groupId: g.id,
           sectionTitle: `${g.title} › ${s.title}`,
           label: it.label,
           status: it.status,

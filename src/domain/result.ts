@@ -131,6 +131,7 @@ export interface SummaryRow {
 }
 
 export interface OpenItem {
+  groupId: string;
   sectionTitle: string;
   label: string;
   status: Status;
@@ -142,6 +143,30 @@ export interface Assumption {
   text: string;
 }
 
+/** 簡易版の表示などに使う主要な数値 */
+export interface KeyFigures {
+  computeRequired: number | null;
+  computeRequiredStatus: Status;
+  computeCandidate: number | null;
+  computeCandidateStatus: Status;
+  computeUnavailable: number | null;
+  vmCpuPerNode: number | null;
+  vmMemPerNodeMiB: number | null;
+  totalCpuDemand: number | null;
+  totalMemDemandMiB: number | null;
+  cpPerNodeCpu: number;
+  cpPerNodeMemGB: number;
+  cpRowStatus: Status;
+  cpRowId: string | null;
+  infraEnabled: boolean;
+  infraRowStatus: Status;
+  infraRowId: string | null;
+  infraPerNodeGuideCpu: number | null;
+  infraPerNodeGuideMemMiB: number | null;
+  vmLogicalBytes: number | null;
+  physicalBytes: number | null;
+}
+
 export interface SizingResult {
   calculatedAt: string;
   product: { ocp: string; virt: string };
@@ -151,6 +176,7 @@ export interface SizingResult {
   groups: { id: string; title: string; sections: Section[] }[];
   openItems: OpenItem[];
   usedRefs: string[];
+  figures: KeyFigures;
 }
 
 // ---- 数値の表示 ----

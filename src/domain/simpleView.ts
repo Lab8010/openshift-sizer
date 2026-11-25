@@ -1,0 +1,213 @@
+// 簡易版の結果表示（画面と印刷で共通）。詳細版と同じ計算結果から組み立てる。
+import { fmt, fmtBytes, fmtMiB, type Kind, type ResultItem, type SizingResult, type Status } from './result';
+import { CP_SCALE_ROWS, INFRA_SCALE_ROWS, OFFICIAL } from './sources';
+import type { SimpleInput } from './simple';
+
+export interface SimpleRow {
+  label: string;
+  value: string;
+  kind: Kind;
+  status?: Status;
+  note?: string;
+  refs?: string[];
+}
+
+export interface SimpleView {
+  verdict: { status: Status; headline: string; details: string[] };
+  sections: { title: string; rows: SimpleRow[] }[];
+}
+
+/** 簡易版で結果を表示するグループ（ネットワーク・サービス等は詳細版で扱う） */
+export const SIMPLE_GROUP_IDS = ['vm', 'compute', 'controlPlane', 'infra', 'storage', 'bootstrap'];
+
+const pct = (v: number) => `${fmt(Math.round(v * 10) / 10)} %`;
+
+export function buildSimpleView(simple: SimpleInput, result: SizingResult): SimpleView {
+  const items = new Map<string, ResultItem>();
+  result.groups.forEach((g) => g.sections.forEach((s) => s.items.forEach((i) => items.set(i.id, i))));
+  const it = (id: string) => items.get(id);
+  const disp = (id: string) => {
+    const x = it(id);
+    return x && x.value !== undefined ? (x.display ?? '') : '未算出';
+  };
+  const f = result.figures;
+  const tol = Number(simple.tolerance);
+
+  // ---- 判定 ----
+  const details: string[] = [];
+  let status: Status;
+  let headline: string;
+  const required = f.computeRequired;
+  const reqText = required !== null ? `${fmt(required)} 台` : '未算出';
+  if (f.computeRequiredStatus === 'ng') {
+    status = 'ng';
+    headline = '1 台の物理サーバに収まらない VM があります';
+    const r = it('compute.required');
+    if (r?.text) details.push(r.text);
+  } else if (required === null) {
+    status = 'not_calculated';
+    headline = '必要台数を計算するための入力が不足しています';
+    const miss = new Set<string>();
+    ['vmTotal.cpuReq', 'vmTotal.mem', 'compute.vmCpuPerNode', 'compute.vmMemPerNode'].forEach((id) => it(id)?.missing?.forEach((m) => miss.add(m)));
+    if (miss.size) details.push(`不足：${[...miss].join('、')}`);
+  } else if (f.computeCandidate === null) {
+    status = 'calculated';
+    headline = `VM 用の物理サーバは ${reqText} 必要です`;
+    details.push(`停止・メンテナンスを許容する ${tol} 台を含みます。物理サーバ台数を入力すると、その台数で収まるかを判定します。`);
+  } else if (f.computeCandidateStatus === 'ok' || f.computeCandidateStatus === 'individual') {
+    status = f.computeCandidateStatus;
+    headline = `物理サーバ ${fmt(f.computeCandidate)} 台で収まります（必要 ${reqText}）`;
+    details.push(`停止・メンテナンスを許容する ${tol} 台を含めて評価しています。`);
+  } else if (f.computeCandidateStatus === 'ng') {
+    status = 'ng';
+    headline = `物理サーバ ${fmt(f.computeCandidate)} 台では不足します（必要 ${reqText}）`;
+    ['compute.scNormal', 'compute.scFail', 'compute.scDrain', 'compute.candMin']
+      .map((id) => it(id))
+      .filter((x): x is ResultItem => !!x && x.status === 'ng')
+      .forEach((x) => details.push(`${x.label}：${x.display ?? ''}`));
+  } else {
+    status = f.computeCandidateStatus;
+    headline = `物理サーバ ${fmt(f.computeCandidate)} 台の評価：必要台数は ${reqText}`;
+  }
+  details.push('コントロールプレーン 3 台' + (f.infraEnabled ? 'とインフラノード 3 台' : '') + 'は、VM 用サーバとは別に必要です。');
+
+  // ---- VM の合計 ----
+  const vmRows: SimpleRow[] = [
+    { label: 'VM 台数（合計）', value: disp('vmTotal.defined'), kind: 'derived' },
+    { label: '総 vCPU', value: disp('vmTotal.vcpu'), kind: 'derived' },
+    { label: `CPU 要求量（割り当て比率 ${simple.cpuRatio}:1）`, value: disp('vmTotal.cpuReq'), kind: 'derived', refs: ['cpuAllocationRatio'] },
+    { label: 'メモリ要求量（VM 追加メモリを含む）', value: disp('vmTotal.mem'), kind: 'derived', refs: ['vmMemOverheadBase'] },
+    { label: 'ディスク（論理容量）', value: disp('vmTotal.disk'), kind: 'derived' },
+    {
+      label: 'ディスク（物理容量）',
+      value: f.physicalBytes !== null ? `${fmtBytes(f.physicalBytes)}（係数 × ${simple.storageFactor}、空き容量を含まない）` : '未算出（物理容量係数が未入力）',
+      kind: 'derived',
+      status: f.physicalBytes !== null ? 'unconfirmed' : 'not_calculated',
+    },
+  ];
+
+  // ---- VM 用物理サーバ ----
+  const n = f.computeCandidate ?? required;
+  const capRows: SimpleRow[] = [
+    { label: '必要台数（停止許容分を含む）', value: reqText, kind: 'derived', status: f.computeRequiredStatus, refs: ['installComputeCount', 'migrationReserve'] },
+    { label: '入力した台数', value: f.computeCandidate !== null ? `${fmt(f.computeCandidate)} 台` : '未入力', kind: 'input', status: f.computeCandidate !== null ? f.computeCandidateStatus : undefined },
+    {
+      label: '1 台で VM に使える CPU',
+      value: f.vmCpuPerNode !== null ? `${fmt(f.vmCpuPerNode)} コア` : '未算出',
+      kind: 'derived',
+      note: 'Allocatable − 常駐 Pod − Virtualization の Worker 分（約 2 コア）',
+      refs: ['OCP-NODES', 'virtCpuPerWorker'],
+    },
+    {
+      label: '1 台で VM に使えるメモリ',
+      value: f.vmMemPerNodeMiB !== null ? fmtMiB(f.vmMemPerNodeMiB) : '未算出',
+      kind: 'derived',
+      note: 'Allocatable − 常駐 Pod − Virtualization の Worker 分（約 360 MiB）',
+      refs: ['OCP-NODES', 'virtMemPerWorker'],
+    },
+  ];
+  if (n !== null && f.vmCpuPerNode && f.vmMemPerNodeMiB && f.totalCpuDemand !== null && f.totalMemDemandMiB !== null) {
+    const label = f.computeCandidate !== null ? `入力した ${fmt(n)} 台` : `必要台数 ${fmt(n)} 台`;
+    capRows.push({
+      label: `平常時の使用率（${label}）`,
+      value: `CPU ${pct((f.totalCpuDemand / (f.vmCpuPerNode * n)) * 100)}、メモリ ${pct((f.totalMemDemandMiB / (f.vmMemPerNodeMiB * n)) * 100)}`,
+      kind: 'derived',
+      note: 'VM に使える容量の合計に対する要求量の割合（実際の負荷率ではない）',
+    });
+    if (tol > 0 && n - tol >= 1) {
+      capRows.push({
+        label: `${tol} 台停止時の使用率（残り ${fmt(n - tol)} 台）`,
+        value: `CPU ${pct((f.totalCpuDemand / (f.vmCpuPerNode * (n - tol))) * 100)}、メモリ ${pct((f.totalMemDemandMiB / (f.vmMemPerNodeMiB * (n - tol))) * 100)}`,
+        kind: 'derived',
+      });
+    }
+  }
+  for (const id of ['compute.scNormal', 'compute.scFail', 'compute.scDrain']) {
+    const x = it(id);
+    if (x) capRows.push({ label: x.label, value: x.display ?? '', kind: x.kind, status: x.status, refs: x.refs });
+  }
+
+  // ---- コントロールプレーン ----
+  const cpRow = CP_SCALE_ROWS.find((r) => r.id === f.cpRowId);
+  const cpRows: SimpleRow[] = [
+    { label: '台数', value: `${OFFICIAL.installCpCount.value} 台（VM 用サーバとは別）`, kind: 'official_min', refs: ['installCpCount'] },
+    {
+      label: '1 台あたりの CPU',
+      value: `${fmt(f.cpPerNodeCpu)} コア以上`,
+      kind: cpRow ? 'official_rec' : 'official_min',
+      status: f.cpRowStatus === 'individual' ? 'individual' : undefined,
+      note: cpRow
+        ? `インストール最低要件 ${OFFICIAL.installCpCpu.value} vCPU と、公式試験の参考点 ${cpRow.cpuCores} コア（コンピュート ${cpRow.nodes} 台・${fmt(cpRow.namespaces)} Namespace）の大きい方`
+        : f.cpRowStatus === 'individual'
+          ? '公式試験の適用範囲を超えるため要個別評価。値はインストール最低要件'
+          : 'インストール最低要件。Namespace 数を入力すると公式試験の参考点も反映します',
+      refs: cpRow ? ['installCpCpu', cpRow.id] : ['installCpCpu'],
+    },
+    {
+      label: '1 台あたりのメモリ',
+      value: `${fmt(f.cpPerNodeMemGB)} GB 以上`,
+      kind: cpRow ? 'official_rec' : 'official_min',
+      refs: cpRow ? ['installCpRam', cpRow.id] : ['installCpRam'],
+    },
+    {
+      label: '1 台あたりのディスク',
+      value: `${OFFICIAL.installCpDisk.value} GB 以上・${OFFICIAL.installCpIops.value} IOPS 以上（+ Virtualization 約 ${OFFICIAL.virtStoragePerNode.value} GiB）`,
+      kind: 'official_min',
+      note: 'etcd 用に p99 fsync 10 ms 未満、メンバー間 p99 RTT 50 ms 未満を確認',
+      refs: ['installCpDisk', 'virtStoragePerNode', 'etcdFsyncP99', 'etcdRttP99'],
+    },
+  ];
+
+  // ---- インフラ ----
+  const infraRows: SimpleRow[] = [];
+  if (f.infraEnabled) {
+    const row = INFRA_SCALE_ROWS.find((r) => r.id === f.infraRowId);
+    infraRows.push({ label: '台数', value: `${OFFICIAL.infraRecommendedCount.value} 台（一般推奨、VM 用サーバとは別）`, kind: 'official_rec', refs: ['infraRecommendedCount'] });
+    if (row && f.infraPerNodeGuideCpu !== null && f.infraPerNodeGuideMemMiB !== null) {
+      infraRows.push({
+        label: '1 台あたりの CPU（目安）',
+        value: `${fmt(f.infraPerNodeGuideCpu)} コア`,
+        kind: 'derived',
+        note: `公式試験の参考サイズ ${row.cpuCores} コア + Virtualization のインフラ分 4 コアを 3 台で均等に分けた概算`,
+        refs: [row.id, 'virtCpuInfraTotal'],
+      });
+      infraRows.push({
+        label: '1 台あたりのメモリ（目安）',
+        value: fmtMiB(f.infraPerNodeGuideMemMiB),
+        kind: 'derived',
+        note: `公式試験の参考サイズ ${row.memoryGB} GB + Virtualization 分（2,179 MiB ÷ 3 + 150 MiB）`,
+        refs: [row.id, 'virtMemInfraTotal', 'virtMemPerInfraNode'],
+      });
+    } else {
+      infraRows.push({
+        label: '1 台あたりの CPU・メモリ',
+        value: f.infraRowStatus === 'individual' ? '要個別評価（公式試験の適用範囲外）' : '未算出',
+        kind: 'official_rec',
+        status: f.infraRowStatus === 'individual' ? 'individual' : 'not_calculated',
+        note: f.infraRowStatus === 'individual' ? undefined : 'Namespace 数を入力すると公式試験の参考サイズを表示します',
+      });
+    }
+  } else {
+    infraRows.push({ label: 'インフラノード', value: '使わない（Virtualization のインフラ分を VM 用サーバに計上）', kind: 'input', status: 'na' });
+  }
+
+  const bootRows: SimpleRow[] = [
+    {
+      label: 'ブートストラップ（インストール時のみ）',
+      value: `${OFFICIAL.installBootstrapCount.value} 台：${OFFICIAL.installBootstrapCpu.value} vCPU・${OFFICIAL.installBootstrapRam.value} GB・${OFFICIAL.installBootstrapDisk.value} GB`,
+      kind: 'official_min',
+      refs: ['installBootstrapCpu'],
+    },
+  ];
+
+  return {
+    verdict: { status, headline, details },
+    sections: [
+      { title: 'VM の合計', rows: vmRows },
+      { title: 'VM 用の物理サーバ（コンピュートノード）', rows: capRows },
+      { title: 'コントロールプレーン', rows: cpRows },
+      { title: 'インフラノード', rows: infraRows },
+      { title: 'その他', rows: bootRows },
+    ],
+  };
+}

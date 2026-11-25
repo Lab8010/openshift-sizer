@@ -278,6 +278,7 @@ export interface SizingModel {
   paths: PathN[];
   backends: BackendN[];
   isSample: boolean;
+  extraAssumptions: string[];
 }
 
 const ROLE_LABEL: Record<RoleKey, string> = {
@@ -474,6 +475,7 @@ export function parseInput(input: SizingInput): { model: SizingModel; errors: Fi
     paths,
     backends,
     isSample: !!input.isSample,
+    extraAssumptions: input.extraAssumptions ?? [],
   };
   return { model, errors: p.errors };
 }

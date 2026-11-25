@@ -14,28 +14,36 @@ import {
   type SizingInput,
 } from './types';
 import { BANDWIDTH_UNITS, CAPACITY_UNITS, MEMORY_UNITS, THROUGHPUT_UNITS } from './units';
+import { parseSimple, type SimpleInput } from './simple';
+
+export type InputMode = 'simple' | 'detail';
 
 export interface ExportFile {
   schemaVersion: number;
   product: { ocp: string; virt: string; version: string };
   exportedAt: string;
+  /** 保存時の入力モード。簡易版では input は simple から組み立てた入力 */
+  mode: InputMode;
+  simple?: SimpleInput;
   input: SizingInput;
   result: SizingResult;
   references: { id: string; title: string; sections: string; url: string }[];
 }
 
-export function buildExport(input: SizingInput, result: SizingResult, now = new Date()): ExportFile {
+export function buildExport(input: SizingInput, result: SizingResult, now = new Date(), simple?: SimpleInput): ExportFile {
   return {
     schemaVersion: SCHEMA_VERSION,
     product: { ocp: PRODUCT.ocp, virt: PRODUCT.virt, version: PRODUCT.version },
     exportedAt: now.toISOString(),
+    mode: simple ? 'simple' : 'detail',
+    ...(simple ? { simple } : {}),
     input,
     result,
     references: Object.values(SOURCES).map((s) => ({ id: s.id, title: s.title, sections: s.sections, url: s.url })),
   };
 }
 
-export type ImportResult = { ok: true; input: SizingInput; warnings: string[] } | { ok: false; errors: string[] };
+export type ImportResult = { ok: true; input: SizingInput; warnings: string[]; mode: InputMode; simple?: SimpleInput } | { ok: false; errors: string[] };
 
 type Obj = Record<string, unknown>;
 const isObj = (v: unknown): v is Obj => typeof v === 'object' && v !== null && !Array.isArray(v);
@@ -294,6 +302,22 @@ export function parseImport(text: string): ImportResult {
     backends,
     isSample: s.bool(i, 'isSample', 'input', false),
   };
+  if (i.extraAssumptions !== undefined) {
+    if (Array.isArray(i.extraAssumptions) && i.extraAssumptions.every((t) => typeof t === 'string')) input.extraAssumptions = i.extraAssumptions as string[];
+    else s.errors.push('input.extraAssumptions は文字列の配列である必要があります');
+  }
+  let mode: InputMode = 'detail';
+  let simple: SimpleInput | undefined;
+  if (data.mode === 'simple') {
+    const sp = parseSimple(data.simple);
+    if (!sp) s.errors.push('簡易版の入力（simple）の形式が不正です');
+    else {
+      mode = 'simple';
+      simple = sp;
+    }
+  } else if (data.mode !== undefined && data.mode !== 'detail') {
+    s.errors.push(`mode の値「${String(data.mode)}」は不正です（simple／detail）`);
+  }
   if (s.errors.length) return { ok: false, errors: s.errors };
 
   // 入力値の検証（現在の計算ロジックで再計算）
@@ -305,5 +329,5 @@ export function parseImport(text: string): ImportResult {
   if (data.result && isObj(data.result) && typeof data.result.calculatedAt === 'string') {
     warnings.push(`保存時の結果（${data.result.calculatedAt}）は参考として扱い、現在の計算ロジックで再計算しました。`);
   }
-  return { ok: true, input, warnings };
+  return { ok: true, input, warnings, mode, ...(simple ? { simple } : {}) };
 }
