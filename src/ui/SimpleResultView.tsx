@@ -74,6 +74,27 @@ export function SimpleResultView({ result, view, simple, update, onEdit, onResta
           </>
         )}
 
+        <section className="mt-6" aria-labelledby="foundation-h">
+          <h2 id="foundation-h" className="font-bold text-slate-900">
+            OpenShift 基盤の要件
+          </h2>
+          <p className="mt-1 text-sm text-slate-600">VM やコンテナの要求量とは別に、クラスタそのものを動かすために必要な条件です（Red Hat 4.22 公式資料）。</p>
+          <div className="mt-3 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+            {view.foundation.map((t) => (
+              <div key={t.title} className="rounded-xl bg-white p-4 ring-1 ring-slate-200">
+                <div className="flex items-center justify-between gap-2">
+                  <span className="text-sm font-medium text-slate-500">{t.title}</span>
+                  {t.status && <StatusPill status={t.status} />}
+                </div>
+                <p className="mt-1 font-bold leading-snug text-slate-900">{t.value}</p>
+                <p className="mt-1 text-sm leading-relaxed text-slate-600">
+                  {t.sub} <RefLinks refs={t.refs} />
+                </p>
+              </div>
+            ))}
+          </div>
+        </section>
+
         <NetworkPanel network={network} simple={simple} update={update} onDiagnose={onDiagnose} onOpenResult={onOpenNetwork} />
 
         <div className="no-print mt-5 flex flex-wrap gap-2">

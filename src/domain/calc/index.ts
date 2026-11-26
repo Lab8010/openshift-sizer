@@ -23,6 +23,7 @@ import { calcCompute, type ComputeCalc } from './compute';
 import { calcControlPlane, type CpCalc } from './controlPlane';
 import { off } from './helpers';
 import { calcInfra, type InfraCalc } from './infra';
+import { calcFoundation } from './foundation';
 import { calcNetwork, type NetworkCalc } from './network';
 import { calcServices } from './services';
 import { calcStorage, type StorageCalc } from './storage';
@@ -46,6 +47,7 @@ export function calculateSizing(input: SizingInput, now: Date = new Date()): Siz
   const cp = calcControlPlane(model, svc, computeCount, computeFrom);
   const infra = calcInfra(model, svc, computeCount, computeFrom);
   const storage = calcStorage(model, vmCalcs, svc);
+  const foundation = calcFoundation(model, computeCount);
   const network = calcNetwork(model, vmCalcs, svc, compute);
   const bootstrap = bootstrapSection();
 
@@ -59,6 +61,7 @@ export function calculateSizing(input: SizingInput, now: Date = new Date()): Siz
     { id: 'controlPlane', title: 'コントロールプレーン', sections: cp.sections },
     { id: 'compute', title: 'コンピュート（VM を稼働させる Worker）', sections: compute.sections },
     { id: 'infra', title: 'インフラ', sections: infra.sections },
+    { id: 'foundation', title: 'OpenShift 基盤の要件（etcd・レジストリ・監視・ネットワークの前提）', sections: foundation.sections },
     { id: 'services', title: 'インフラサービス（監視・Ingress・レジストリ・ログ）', sections: [{ id: 'svc', title: 'サービス別の要求量と保存量', items: svc.items }] },
     { id: 'storage', title: '共有ストレージ（容量・性能）', sections: storage.sections },
     { id: 'network', title: 'ネットワークとライブマイグレーション', sections: network.sections },
@@ -99,6 +102,10 @@ export function calculateSizing(input: SizingInput, now: Date = new Date()): Siz
       infraPerNodeGuideMemMiB: infra.perNodeGuideMemMiB,
       vmLogicalBytes: storage.vmLogicalBytes,
       physicalBytes: storage.physicalTotalBytes,
+      totalNodes: foundation.totalNodes,
+      cpFailureTolerance: foundation.cpFailureTolerance,
+      promRowId: foundation.promRow?.id ?? null,
+      promStatus: foundation.promStatus,
     },
   };
   return { result, errors, model };

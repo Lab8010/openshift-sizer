@@ -18,6 +18,7 @@ export type SourceId =
   | 'OCP-INSTALL'
   | 'OCP-SCALE'
   | 'OCP-ETCD'
+  | 'OCP-ETCD-PERF'
   | 'OCP-NODES'
   | 'VIRT-INSTALL'
   | 'VIRT-VM'
@@ -45,8 +46,8 @@ export const SOURCES: Record<SourceId, SourceDoc> = {
     product: PRODUCT.ocp,
     version: '4.22',
     title: 'Installing a cluster on any platform',
-    sections: '§1.3.1–1.3.2、表 1.1・表 1.2',
-    scope: 'ノードの台数とインストール最低要件',
+    sections: '§1.3.1–1.3.6、§1.17.3、表 1.1–1.7',
+    scope: 'ノードの台数とインストール最低要件、ネットワーク・DNS・ロードバランサーの要件、レジストリのストレージ',
     url: `${DOCS}/openshift_container_platform/4.22/html-single/installing_on_any_platform/index`,
   },
   'OCP-SCALE': {
@@ -54,8 +55,8 @@ export const SOURCES: Record<SourceId, SourceDoc> = {
     product: PRODUCT.ocp,
     version: '4.22',
     title: 'Recommended performance and scalability practices',
-    sections: '§2.1.2、§2.3.1',
-    scope: 'コントロールプレーンとインフラの試験結果、適用条件',
+    sections: '§2.1.2、§2.3.1、§2.3.2.1',
+    scope: 'コントロールプレーンとインフラの試験結果、Prometheus の保存量、適用条件',
     url: `${DOCS}/openshift_container_platform/4.22/html/scalability_and_performance/recommended-performance-and-scalability-practices`,
   },
   'OCP-ETCD': {
@@ -66,6 +67,15 @@ export const SOURCES: Record<SourceId, SourceDoc> = {
     sections: '§2.1–2.3',
     scope: '同期書き込み、fsync、メンバー間 RTT',
     url: `${DOCS}/openshift_container_platform/4.22/html/etcd/etcd-practices`,
+  },
+  'OCP-ETCD-PERF': {
+    id: 'OCP-ETCD-PERF',
+    product: PRODUCT.ocp,
+    version: '4.22',
+    title: 'Performance considerations for etcd',
+    sections: '§3.2、§3.6、§3.10–3.11',
+    scope: 'コントロールプレーンの台数と障害許容、etcd 専用ディスク、etcd データベースの容量',
+    url: `${DOCS}/openshift_container_platform/4.22/html/etcd/etcd-performance`,
   },
   'OCP-NODES': {
     id: 'OCP-NODES',
@@ -208,6 +218,30 @@ export const OFFICIAL = {
     condition: '高負荷クラスタ向けの推奨',
   }),
 
+  // --- OCP-ETCD-PERF ---
+  cpCountMaxBareMetal: ov({
+    id: 'cpCountMaxBareMetal', sourceId: 'OCP-ETCD-PERF', section: '§3.2 表 3.1',
+    label: 'コントロールプレーンの最大台数（ベアメタル）', value: 5, unit: '台', kind: 'official_default',
+    condition: '一般には 3 台。ベアメタルでは 5 台まで（4〜5 台への拡張はベアメタルのみ）。台数を増やすと信頼性は上がるが、スループット低下・レイテンシ増加の可能性がある',
+  }),
+  etcdQuotaDefault: ov({
+    id: 'etcdQuotaDefault', sourceId: 'OCP-ETCD-PERF', section: '§3.11',
+    label: 'etcd のディスククォータ（既定値）', value: 8, unit: 'GiB', kind: 'official_default',
+    condition: 'etcd インスタンスごと。8〜32 GiB の整数で増やせる（減らせない）。etcd はクォータより大きい専用ディスクで動かす',
+  }),
+  etcdQuotaMax: ov({
+    id: 'etcdQuotaMax', sourceId: 'OCP-ETCD-PERF', section: '§3.11',
+    label: 'etcd のディスククォータ（設定できる最大値）', value: 32, unit: 'GiB', kind: 'official_default',
+    condition: 'クォータを増やす場合、コントロールプレーンには追加のメモリとストレージが必要',
+  }),
+
+  // --- OCP-INSTALL（基盤の前提条件） ---
+  registryMinCapacity: ov({
+    id: 'registryMinCapacity', sourceId: 'OCP-INSTALL', section: '§1.17.3.1',
+    label: 'イメージレジストリのストレージ容量', value: 100, unit: 'GiB（100Gi）以上', kind: 'official_min',
+    condition: 'ベアメタル等の手動インストールで構成する永続ボリューム。レプリカ 1 台なら RWO（Recreate）、2 台以上の高可用構成なら RWX が必要',
+  }),
+
   // --- OCP-NODES ---
   sysReservedCpuFloor: ov({
     id: 'sysReservedCpuFloor', sourceId: 'OCP-NODES', section: '§6.12.1',
@@ -328,6 +362,22 @@ export interface ScaleRow {
   condition: string;
 }
 
+/** Prometheus の保存量の試験結果（OCP-SCALE §2.3.2.1 表 2.1）。規範値ではなく参考値 */
+export interface PromStorageRow {
+  id: string;
+  nodes: number;
+  pods: number;
+  perDayGB: number;
+  per15DaysGB: number;
+}
+
+export const PROM_STORAGE_ROWS: PromStorageRow[] = [
+  { id: 'prom50', nodes: 50, pods: 1800, perDayGB: 6.3, per15DaysGB: 94 },
+  { id: 'prom100', nodes: 100, pods: 3600, perDayGB: 13, per15DaysGB: 195 },
+  { id: 'prom150', nodes: 150, pods: 5400, perDayGB: 19, per15DaysGB: 283 },
+  { id: 'prom200', nodes: 200, pods: 7200, perDayGB: 25, per15DaysGB: 375 },
+];
+
 export const CP_SCALE_ROWS: ScaleRow[] = [
   { id: 'cpScale24', sourceId: 'OCP-SCALE', section: '§2.1.2', nodes: 24, namespaces: 500, cpuCores: 4, memoryGB: 16, autoSelectable: true, condition: 'AWS 上の cluster-density 試験（制御プレーン r5.4xlarge、コンピュート m5.2xlarge）' },
   { id: 'cpScale120', sourceId: 'OCP-SCALE', section: '§2.1.2', nodes: 120, namespaces: 1000, cpuCores: 8, memoryGB: 32, autoSelectable: true, condition: 'AWS 上の cluster-density 試験' },
@@ -352,6 +402,30 @@ export const OFFICIAL_NOTES = {
   cpuAllocationRatio: { sourceId: 'VIRT-VM' as SourceId, section: '§8.18.14.2', text: '共有 CPU の Pod CPU 要求量 = vCPU 数 × (1 ÷ vmiCPUAllocationRatio)。専用 CPU はオーバーコミットできません。' },
   infraScope: { sourceId: 'OCP-SCALE' as SourceId, section: '§2.3.1', text: 'インフラの試験値は、クラスタ作成時に導入される Monitoring・Ingress・Registry をホストするインフラノードにのみ適用されます。4.22 では 0.5 コアがシステム予約される前提です。' },
   cpScope: { sourceId: 'OCP-SCALE' as SourceId, section: '§2.1.2', text: '必要量はノード数・オブジェクト数・オブジェクトの作成頻度、OLM が管理する Namespace と Operator の数で変わります。' },
+  etcdDisk: {
+    sourceId: 'OCP-ETCD' as SourceId,
+    section: '§2.1',
+    text: 'etcd は低レイテンシのブロックデバイスで動かす。専用ドライブを使い、ログなど負荷の高いものを同じドライブに置かない。SSD を最低限とし、本番では NVMe を推奨。iSCSI・NFS・NAS／SAN・Ceph RBD などネットワーク越しのストレージと回転ディスクは避ける。I/O の多いワークロードをコントロールプレーンに同居させない。fio などで性能を測る。',
+  },
+  etcdMoveDisk: { sourceId: 'OCP-ETCD-PERF' as SourceId, section: '§3.6', text: '共有ディスクから専用ディスクへ etcd を移すことで、競合する I/O によるレイテンシを避けられる（MCO が追加ディスクをマウント）。' },
+  etcdFailureTolerance: { sourceId: 'OCP-ETCD-PERF' as SourceId, section: '§3.2 表 3.1', text: '障害許容台数：3 台で 1 台、4 台で 1 台、5 台で 2 台。' },
+  promStorage: { sourceId: 'OCP-SCALE' as SourceId, section: '§2.3.2.1 表 2.1', text: 'Prometheus の保存量は規範値ではなく参考値。既定の Cluster Monitoring Operator 構成で、見込み量に約 20% の余裕を加えた値。Pod・コンテナ・Route など、メトリクスを出すリソースが多いと増える。' },
+  lbRequirements: {
+    sourceId: 'OCP-INSTALL' as SourceId,
+    section: '§1.3.6',
+    text: 'ユーザープロビジョニング（UPI）では、インストール前に API とアプリケーション Ingress のロードバランサーを用意する。どちらも L4（Raw TCP／SSL パススルー）。API：6443（Kubernetes API、/readyz でヘルスチェック）と 22623（Machine Config Server、内部のみ）をコントロールプレーンへ、セッション維持はしない。Ingress：443・80 を Ingress Controller が動くノードへ。',
+  },
+  dnsRequirements: {
+    sourceId: 'OCP-INSTALL' as SourceId,
+    section: '§1.3.5 表 1.6',
+    text: 'インストール前に DNS レコードを用意する：api・api-int（API ロードバランサー）、*.apps（Ingress ロードバランサー）、bootstrap、各コントロールプレーン、各コンピュート。API・ブートストラップ・コントロールプレーン・コンピュートには逆引き（PTR）も必要。',
+  },
+  portRequirements: {
+    sourceId: 'OCP-INSTALL' as SourceId,
+    section: '§1.3.4.2 表 1.3–1.5',
+    text: 'ノード間で開けるポート：TCP 2379–2380（etcd、コントロールプレーン間）、TCP 6443（Kubernetes API）、TCP 22623（Machine Config Server）、UDP 6081（Geneve）、TCP 10250–10259、TCP 9000–9999・UDP 9000–9999（ホストのサービス）、TCP/UDP 30000–32767（NodePort）、UDP 123（NTP、外部 NTP を使う場合）、IPsec を使う場合は UDP 500・4500 と ESP。',
+  },
+  ntp: { sourceId: 'OCP-INSTALL' as SourceId, section: '§1.3.4.3', text: '既定では公開 NTP サーバーを使う。社内 NTP や非接続環境では chrony で時刻サーバーを指定する（DHCP から NTP サーバーを配ることもできる）。' },
 } as const;
 
 export interface ResolvedRef {
@@ -368,6 +442,7 @@ export function resolveRef(key: string): ResolvedRef | undefined {
   if (o) return { key, sourceId: o.sourceId, section: o.section, url: SOURCES[o.sourceId].url, title: SOURCES[o.sourceId].title };
   const row = [...CP_SCALE_ROWS, ...INFRA_SCALE_ROWS].find((r) => r.id === key);
   if (row) return { key, sourceId: row.sourceId, section: row.section, url: SOURCES[row.sourceId].url, title: SOURCES[row.sourceId].title };
+  if (PROM_STORAGE_ROWS.some((r) => r.id === key)) return { key, sourceId: 'OCP-SCALE', section: '§2.3.2.1 表 2.1', url: SOURCES['OCP-SCALE'].url, title: SOURCES['OCP-SCALE'].title };
   const note = (OFFICIAL_NOTES as Record<string, { sourceId: SourceId; section: string }>)[key];
   if (note) return { key, sourceId: note.sourceId, section: note.section, url: SOURCES[note.sourceId].url, title: SOURCES[note.sourceId].title };
   if (key in SOURCES) {

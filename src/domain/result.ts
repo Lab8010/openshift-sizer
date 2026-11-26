@@ -166,6 +166,11 @@ export interface KeyFigures {
   infraPerNodeGuideMemMiB: number | null;
   vmLogicalBytes: number | null;
   physicalBytes: number | null;
+  /** 全ノード数（コントロールプレーン + コンピュート + インフラ） */
+  totalNodes: number | null;
+  cpFailureTolerance: number | null;
+  promRowId: string | null;
+  promStatus: Status;
 }
 
 export interface SizingResult {

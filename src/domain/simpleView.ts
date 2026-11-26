@@ -1,6 +1,6 @@
 // 簡易版の結果表示（画面と印刷で共通）。詳細版と同じ計算結果から組み立てる。
 import { fmt, fmtBytes, fmtMiB, type Kind, type ResultItem, type SizingResult, type Status } from './result';
-import { CP_SCALE_ROWS, INFRA_SCALE_ROWS, OFFICIAL } from './sources';
+import { CP_SCALE_ROWS, INFRA_SCALE_ROWS, OFFICIAL, PROM_STORAGE_ROWS } from './sources';
 import type { SimpleInput } from './simple';
 
 export interface SimpleRow {
@@ -24,8 +24,19 @@ export interface SimpleReason {
   text: string;
 }
 
+export interface FoundationTile {
+  kind: Kind;
+  title: string;
+  value: string;
+  sub: string;
+  refs: string[];
+  status?: Status;
+}
+
 export interface SimpleView {
   verdict: { status: Status; headline: string; details: string[] };
+  /** OpenShift 基盤としての要件（VM の要求量とは別） */
+  foundation: FoundationTile[];
   /** 結論のすぐ下に並べる 3 ロールの台数と 1 台あたりの目安 */
   cards: SimpleCard[];
   /** なぜこの台数か */
@@ -34,7 +45,7 @@ export interface SimpleView {
 }
 
 /** 簡易版で結果を表示するグループ（ネットワーク・サービス等は詳細版で扱う） */
-export const SIMPLE_GROUP_IDS = ['vm', 'compute', 'controlPlane', 'infra', 'storage', 'bootstrap'];
+export const SIMPLE_GROUP_IDS = ['vm', 'compute', 'controlPlane', 'infra', 'foundation', 'storage', 'bootstrap'];
 
 /** 簡易版の確認事項に出す項目（簡易版で尋ねない候補仕様などの「未入力」は出さない） */
 export function isSimpleOpenItem(itemId: string): boolean {
@@ -43,6 +54,7 @@ export function isSimpleOpenItem(itemId: string): boolean {
     /^vm\.[^.]+\.(cpuReq|memPerVm|diskTotal|limits)$/.test(itemId) ||
     /^compute\.(required|scNormal|scFail|scDrain|candMin|vmCpuPerNode|vmMemPerNode|limitHosts|limitVms)$/.test(itemId) ||
     /^(cp|infra)\.scaleRow$/.test(itemId) ||
+    /^foundation\.(cpCount|prom)$/.test(itemId) ||
     /^storage\.[^.]+\.physical$/.test(itemId)
   );
 }
@@ -248,7 +260,7 @@ export function buildSimpleView(simple: SimpleInput, result: SizingResult): Simp
     {
       title: 'コントロールプレーン',
       value: `${OFFICIAL.installCpCount.value} 台 × ${fmt(f.cpPerNodeCpu)} コア・${fmt(f.cpPerNodeMemGB)} GB 以上`,
-      sub: cpRow ? `公式試験の参考点（${fmt(cpRow.namespaces)} Namespace）とインストール最低要件から` : f.cpRowStatus === 'individual' ? '公式試験の範囲外のため要個別評価' : 'インストール最低要件から',
+      sub: `ディスク ${OFFICIAL.installCpDisk.value} GB 以上 + etcd 用の専用 SSD／NVMe。${cpRow ? `公式試験の参考点（${fmt(cpRow.namespaces)} Namespace）とインストール最低要件から` : f.cpRowStatus === 'individual' ? '公式試験の範囲外のため要個別評価' : 'インストール最低要件から'}`,
       status: f.cpRowStatus === 'individual' ? 'individual' : undefined,
     },
     f.infraEnabled
@@ -293,8 +305,55 @@ export function buildSimpleView(simple: SimpleInput, result: SizingResult): Simp
     });
   }
 
+  // ---- OpenShift 基盤の要件 ----
+  const prom = PROM_STORAGE_ROWS.find((r) => r.id === f.promRowId);
+  const foundation: FoundationTile[] = [
+    {
+      kind: 'official_rec',
+      title: 'etcd 用ディスク',
+      value: `専用 SSD／NVMe、${OFFICIAL.etcdQuotaDefault.value} GiB 超`,
+      sub: `p99 fsync ${OFFICIAL.etcdFsyncP99.value} ms 未満、8 KB 同期書き込み ${OFFICIAL.etcdSeqWriteIops.value} IOPS 以上。ネットワーク越しのストレージ（iSCSI・NFS・Ceph RBD など）は避ける`,
+      refs: ['etcdDisk', 'etcdQuotaDefault', 'etcdFsyncP99', 'etcdSeqWriteIops'],
+      status: 'unconfirmed',
+    },
+    {
+      kind: 'official_default',
+      title: 'コントロールプレーンの障害許容',
+      value: f.cpFailureTolerance !== null ? `3 台で ${f.cpFailureTolerance} 台まで停止可` : '—',
+      sub: `etcd の過半数を保てる台数。ベアメタルなら最大 ${OFFICIAL.cpCountMaxBareMetal.value} 台（5 台で 2 台まで）にできる`,
+      refs: ['etcdFailureTolerance', 'cpCountMaxBareMetal'],
+    },
+    {
+      kind: 'official_min',
+      title: 'イメージレジストリ',
+      value: `永続ボリューム ${OFFICIAL.registryMinCapacity.value} GiB 以上`,
+      sub: 'レプリカ 2 台以上の高可用構成は RWX のストレージが必要（1 台なら RWO）',
+      refs: ['registryMinCapacity'],
+    },
+    {
+      kind: 'official_rec',
+      title: '監視（Prometheus）の保存量',
+      value: prom ? `15 日で約 ${fmt(prom.per15DaysGB)} GB` : f.promStatus === 'individual' ? '要個別評価' : '未算出',
+      sub: prom
+        ? `全 ${fmt(f.totalNodes ?? 0)} ノード → 公式試験（${prom.nodes} ノード・1 日 ${fmt(prom.perDayGB)} GB）の参考値`
+        : f.promStatus === 'individual'
+          ? '公式試験（200 ノードまで）の範囲を超える'
+          : 'サーバ台数が決まると表示します',
+      refs: prom ? [prom.id, 'promStorage'] : ['promStorage'],
+      status: f.promStatus === 'individual' ? 'individual' : undefined,
+    },
+    {
+      kind: 'official_min',
+      title: 'ロードバランサー・DNS・NTP',
+      value: 'インストール前に用意',
+      sub: 'API（6443・22623）と Ingress（443・80）の L4 ロードバランサー、api・api-int・*.apps などの DNS と逆引き、ノード間ポート、NTP',
+      refs: ['lbRequirements', 'dnsRequirements', 'portRequirements', 'ntp'],
+    },
+  ];
+
   return {
     verdict: { status, headline, details },
+    foundation,
     cards,
     reasons,
     sections: [
@@ -302,6 +361,10 @@ export function buildSimpleView(simple: SimpleInput, result: SizingResult): Simp
       { title: 'VM 用の物理サーバ（コンピュートノード）', rows: capRows },
       { title: 'コントロールプレーン', rows: cpRows },
       { title: 'インフラノード', rows: infraRows },
+      {
+        title: 'OpenShift 基盤の要件（VM の要求量とは別）',
+        rows: foundation.map((t) => ({ label: t.title, value: t.value, kind: t.kind, status: t.status, note: t.sub, refs: t.refs })),
+      },
       { title: 'その他', rows: bootRows },
     ],
   };
