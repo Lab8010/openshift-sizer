@@ -205,5 +205,6 @@ describe('§1.4 / §5.4 シンプルさと意思決定支援', () => {
       expect(computePath(r).length).toBeLessThanOrEqual(11);
       if (r.q7 === 'ip-must-persist' || r.q5 === 'l2-dependent') expect(d.primary, JSON.stringify(r)).not.toBe('A');
     }
-  });
+    // 全回答の総当たりは CI の実行環境で数秒かかるため、既定の 5 秒より長く待つ
+  }, 60_000);
 });
