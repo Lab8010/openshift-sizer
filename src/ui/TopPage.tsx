@@ -7,29 +7,33 @@ interface Props {
   onSample: () => void;
   onDetail: () => void;
   onImport: () => void;
+  onNetwork: () => void;
 }
 
 /** 何ができるか 3 行 + はじめるボタン + 所要時間（Network Advisor と同じ構成） */
-export function TopPage({ hasPrevious, onStart, onResume, onSample, onDetail, onImport }: Props) {
+export function TopPage({ hasPrevious, onStart, onResume, onSample, onDetail, onImport, onNetwork }: Props) {
   const link = 'text-red-800 underline underline-offset-2 hover:text-red-900';
   return (
     <div className="mx-auto max-w-2xl px-4 py-16 sm:py-24">
       <h1 className="text-3xl font-bold leading-tight text-slate-900 sm:text-4xl">
         その VM、OpenShift では
         <br className="hidden sm:inline" />
-        何台のサーバに載る？
+        何台のサーバに、どのネットワークで載せる？
       </h1>
       <ul className="mt-8 space-y-3 text-lg leading-relaxed text-slate-700">
-        <li>・載せたい VM のサイズと台数、サーバの大きさを選択式で答えていくと</li>
-        <li>・VM 用の物理サーバの必要台数と、コントロールプレーン・インフラの目安を計算し</li>
-        <li>・根拠と出典つきの結果を、その場で PDF レポートにできます</li>
+        <li>・載せたい VM とサーバの大きさを選択式で答えると、必要なサーバ台数と各ノードの目安を計算し</li>
+        <li>・VM のつなぎ方を答えると、OpenShift Virtualization のネットワーク構成を診断して</li>
+        <li>・根拠と出典つきの結果を、その場で 1 つの PDF レポートにまとめられます</li>
       </ul>
       <div className="mt-10 flex flex-wrap items-center gap-4">
         <Button onClick={onStart} className="!px-8 !py-3.5 !text-base">
           サイジングをはじめる →
         </Button>
-        <span className="text-sm text-slate-500">約 3 分・質問は 8 問（うち 2 問は任意）</span>
+        <Button variant="secondary" onClick={onNetwork} className="!px-6 !py-3.5 !text-base">
+          ネットワーク構成を診断する →
+        </Button>
       </div>
+      <p className="mt-3 text-sm text-slate-500">どちらも約 3 分。サイジングは 8 問、ネットワーク診断は 5〜10 問です。どちらから始めても、結果は互いに連携します。</p>
       <div className="mt-12 space-y-2 text-sm text-slate-500">
         {hasPrevious && (
           <p>

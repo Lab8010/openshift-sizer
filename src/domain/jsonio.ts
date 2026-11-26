@@ -15,6 +15,8 @@ import {
 } from './types';
 import { BANDWIDTH_UNITS, CAPACITY_UNITS, MEMORY_UNITS, THROUGHPUT_UNITS } from './units';
 import { parseSimple, type SimpleInput } from './simple';
+import { parseNetworkAnswers } from './networkLink';
+import type { Answers } from '../network/data/types';
 
 export type InputMode = 'simple' | 'detail';
 
@@ -25,25 +27,30 @@ export interface ExportFile {
   /** 保存時の入力モード。簡易版では input は simple から組み立てた入力 */
   mode: InputMode;
   simple?: SimpleInput;
+  /** ネットワーク構成診断の回答（結果は読み込み時に再診断する） */
+  network?: { answers: Answers };
   input: SizingInput;
   result: SizingResult;
   references: { id: string; title: string; sections: string; url: string }[];
 }
 
-export function buildExport(input: SizingInput, result: SizingResult, now = new Date(), simple?: SimpleInput): ExportFile {
+export function buildExport(input: SizingInput, result: SizingResult, now = new Date(), simple?: SimpleInput, networkAnswers?: Answers): ExportFile {
   return {
     schemaVersion: SCHEMA_VERSION,
     product: { ocp: PRODUCT.ocp, virt: PRODUCT.virt, version: PRODUCT.version },
     exportedAt: now.toISOString(),
     mode: simple ? 'simple' : 'detail',
     ...(simple ? { simple } : {}),
+    ...(networkAnswers && Object.keys(networkAnswers).length ? { network: { answers: networkAnswers } } : {}),
     input,
     result,
     references: Object.values(SOURCES).map((s) => ({ id: s.id, title: s.title, sections: s.sections, url: s.url })),
   };
 }
 
-export type ImportResult = { ok: true; input: SizingInput; warnings: string[]; mode: InputMode; simple?: SimpleInput } | { ok: false; errors: string[] };
+export type ImportResult =
+  | { ok: true; input: SizingInput; warnings: string[]; mode: InputMode; simple?: SimpleInput; networkAnswers: Answers }
+  | { ok: false; errors: string[] };
 
 type Obj = Record<string, unknown>;
 const isObj = (v: unknown): v is Obj => typeof v === 'object' && v !== null && !Array.isArray(v);
@@ -318,6 +325,9 @@ export function parseImport(text: string): ImportResult {
   } else if (data.mode !== undefined && data.mode !== 'detail') {
     s.errors.push(`mode の値「${String(data.mode)}」は不正です（simple／detail）`);
   }
+  const net = isObj(data.network) ? data.network.answers : data.network === undefined ? undefined : null;
+  const networkAnswers = parseNetworkAnswers(net);
+  if (networkAnswers === null) s.errors.push('ネットワーク診断の回答（network.answers）の形式が不正です');
   if (s.errors.length) return { ok: false, errors: s.errors };
 
   // 入力値の検証（現在の計算ロジックで再計算）
@@ -329,5 +339,5 @@ export function parseImport(text: string): ImportResult {
   if (data.result && isObj(data.result) && typeof data.result.calculatedAt === 'string') {
     warnings.push(`保存時の結果（${data.result.calculatedAt}）は参考として扱い、現在の計算ロジックで再計算しました。`);
   }
-  return { ok: true, input, warnings, mode, ...(simple ? { simple } : {}) };
+  return { ok: true, input, warnings, mode, ...(simple ? { simple } : {}), networkAnswers: networkAnswers ?? {} };
 }

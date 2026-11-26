@@ -1,8 +1,10 @@
 import type { SizingResult } from '../domain/result';
 import { AssumptionList, Legend, OpenItemsList, SectionView, SourcesList, SummaryTable } from './ResultParts';
 import { StatusBadge } from './common';
+import type { NetworkState } from '../domain/networkLink';
+import { NetworkReportSection } from './NetworkPanels';
 
-export function ResultsView({ result }: { result: SizingResult }) {
+export function ResultsView({ result, network }: { result: SizingResult; network?: NetworkState }) {
   const vmTotals = result.groups.find((g) => g.id === 'vm')?.sections[0]?.items ?? [];
   const pick = (id: string) => vmTotals.find((i) => i.id === id);
   const keyIds = ['vmTotal.vcpu', 'vmTotal.cpuReq', 'vmTotal.mem', 'vmTotal.disk'];
@@ -29,6 +31,7 @@ export function ResultsView({ result }: { result: SizingResult }) {
       <h2>ノード別サマリー</h2>
       <SummaryTable result={result} />
       <Legend />
+      {network && <NetworkReportSection network={network} heading="ネットワーク構成（診断結果）" />}
       <h2>前提と仮定</h2>
       <AssumptionList result={result} />
       <h2>未確認事項・要対応（{result.openItems.length} 件）</h2>

@@ -7,6 +7,8 @@ import { RefLinks } from './common';
 import { Accordion, Button, StatusPill, TwNumber, TwQty, TwText } from './kit';
 import { SectionView, SourcesList } from './ResultParts';
 import type { SimpleUpdate } from './SizingWizard';
+import { networkSizingChecks, type NetworkState } from '../domain/networkLink';
+import { NetworkPanel } from './NetworkPanels';
 
 interface Props {
   result: SizingResult;
@@ -18,9 +20,13 @@ interface Props {
   onPrint: () => void;
   onExport: () => void;
   onDetail: () => void;
+  network: NetworkState;
+  onDiagnose: () => void;
+  onOpenNetwork: () => void;
 }
 
-export function SimpleResultView({ result, view, simple, update, onEdit, onRestart, onPrint, onExport, onDetail }: Props) {
+export function SimpleResultView({ result, view, simple, update, onEdit, onRestart, onPrint, onExport, onDetail, network, onDiagnose, onOpenNetwork }: Props) {
+  const checklist = [...(network.diagnosis ? networkSizingChecks(network.diagnosis) : []), ...SIMPLE_CHECKLIST];
   const open = result.openItems.filter((o) => isSimpleOpenItem(o.itemId));
   const warnings = open.filter((o) => o.status === 'ng' || o.status === 'individual');
   const toConfirm = open.filter((o) => o.status !== 'ng' && o.status !== 'individual');
@@ -67,6 +73,8 @@ export function SimpleResultView({ result, view, simple, update, onEdit, onResta
             </ol>
           </>
         )}
+
+        <NetworkPanel network={network} simple={simple} update={update} onDiagnose={onDiagnose} onOpenResult={onOpenNetwork} />
 
         <div className="no-print mt-5 flex flex-wrap gap-2">
           <Button onClick={onPrint}>印刷／PDF 保存</Button>
@@ -151,10 +159,10 @@ export function SimpleResultView({ result, view, simple, update, onEdit, onResta
           </div>
         </Accordion>
 
-        <Accordion title="導入前に確認すること" meta={`${SIMPLE_CHECKLIST.length + toConfirm.length} 件`}>
+        <Accordion title="導入前に確認すること" meta={`${checklist.length + toConfirm.length} 件`}>
           <p className="text-sm text-slate-600">簡易版では入力しない項目です。実環境で確かめてください。ネットワークやストレージ性能は詳細入力でも見積もれます。</p>
           <ul className="mt-3 space-y-2 text-sm">
-            {SIMPLE_CHECKLIST.map((c, i) => (
+            {checklist.map((c, i) => (
               <li key={i} className="flex gap-2 rounded-lg bg-slate-50 p-3 leading-relaxed text-slate-700">
                 <span aria-hidden className="text-slate-400">
                   □

@@ -1,6 +1,8 @@
 // 簡易版の入力モデルと、詳細版の入力モデルへの変換（純粋関数）。
 // 簡易版で尋ねない値は「簡易版の仮定値」として明示し、結果の前提に表示する。
 import { emptyBackend, emptyInput, emptyVm, newId, type Qty, type SizingInput } from './types';
+import type { Diagnosis } from '../network/data/types';
+import { patterns } from '../network/data/patterns';
 import { CAPACITY_UNITS, MEMORY_UNITS, isUnit, type CapacityUnit, type MemoryUnit } from './units';
 
 export const CPU_RATIO_OPTIONS = ['1', '2', '4', '8', '10'] as const;
@@ -37,8 +39,13 @@ export interface SimpleInput {
     residentMem: Qty<MemoryUnit>;
     evictionMem: Qty<MemoryUnit>;
   };
+  /** SR-IOV を使う VM（ネットワーク診断の例外枠 F と連携） */
+  sriov: { vmIds: string[]; devicesPerVm: SriovDevices };
   isSample: boolean;
 }
+
+export const SRIOV_DEVICE_OPTIONS = ['1', '2', '3', '4'] as const;
+export type SriovDevices = (typeof SRIOV_DEVICE_OPTIONS)[number];
 
 /** 簡易版の仮定値の初期値（このアプリの仮定。公式値ではない） */
 export const SIMPLE_DEFAULT_ASSUMPTIONS: SimpleInput['assumptions'] = {
@@ -65,6 +72,7 @@ export function emptySimple(): SimpleInput {
     namespaces: '',
     storageFactor: '',
     assumptions: structuredClone(SIMPLE_DEFAULT_ASSUMPTIONS),
+    sriov: { vmIds: [], devicesPerVm: '1' },
     isSample: false,
   };
 }
@@ -84,14 +92,15 @@ export function sampleSimple(): SimpleInput {
     namespaces: '50',
     storageFactor: '3',
     assumptions: structuredClone(SIMPLE_DEFAULT_ASSUMPTIONS),
+    sriov: { vmIds: [], devicesPerVm: '1' },
     isSample: true,
   };
 }
 
 const q = (x: Qty<string>) => (x.raw.trim() ? `${x.raw} ${x.unit}` : '未入力');
 
-/** 簡易版の入力から詳細版の入力モデルを組み立てる */
-export function simpleToSizingInput(s: SimpleInput): SizingInput {
+/** 簡易版の入力から詳細版の入力モデルを組み立てる。ネットワーク診断の結果があれば前提に加える */
+export function simpleToSizingInput(s: SimpleInput, network?: Diagnosis | null): SizingInput {
   const x = emptyInput();
   x.isSample = s.isSample;
   x.cluster.projectName = s.projectName;
@@ -113,6 +122,7 @@ export function simpleToSizingInput(s: SimpleInput): SizingInput {
     disk: { ...v.disk },
     cpuMode: 'shared',
     allocationRatio: s.cpuRatio,
+    sriov: s.sriov.vmIds.includes(v.id) ? s.sriov.devicesPerVm : '0',
     backendId: useBackend ? SIMPLE_BACKEND_ID : '',
   }));
 
@@ -144,6 +154,18 @@ export function simpleToSizingInput(s: SimpleInput): SizingInput {
       : 'コントロールプレーン 3 台を VM 用サーバとは別に用意し、インフラノードは使わない前提です。Virtualization のインフラ分（4 コア・2,179 MiB）を VM 用サーバへ計上します。監視・Ingress などのサービス要求量は含みません。',
     useBackend ? `共有ストレージの物理容量係数は ${s.storageFactor} です（スナップショット・空き容量は含めません）。` : '共有ストレージの物理容量係数が未入力のため、物理容量は未算出です。',
   ];
+  const sriovVms = s.vms.filter((v) => s.sriov.vmIds.includes(v.id));
+  if (sriovVms.length) {
+    x.extraAssumptions.push(
+      `SR-IOV デバイスを VM 1 台あたり ${s.sriov.devicesPerVm} 個、${sriovVms.map((v) => `「${v.name || 'VM'}」`).join('、')}に割り当てて VM の追加メモリを計算しています（特殊デバイスのため配置は要個別評価）。`,
+    );
+  }
+  if (network) {
+    const p = patterns[network.primary];
+    x.extraAssumptions.push(
+      `ネットワーク構成は「パターン ${p.id}: ${p.shortName}」と診断済みです${network.modifiers.includes('E') ? '（マルチホームあり）' : ''}${network.exceptionNote === 'F' ? '（SR-IOV を例外枠として検討）' : ''}。帯域や NIC の割り当ては簡易版では計算しません。`,
+    );
+  }
   return x;
 }
 
@@ -193,9 +215,15 @@ export function parseSimple(v: unknown): SimpleInput | null {
   const tol = v.tolerance === undefined ? d.tolerance : v.tolerance;
   const infra = v.infra === undefined ? d.infra : v.infra;
   if (!isUnit(CPU_RATIO_OPTIONS, ratio) || !isUnit(TOLERANCE_OPTIONS, tol) || (infra !== 'separate' && infra !== 'none')) return null;
+  let sriov: SimpleInput['sriov'] = { vmIds: [], devicesPerVm: '1' };
+  if (v.sriov !== undefined) {
+    if (!isObj(v.sriov) || !Array.isArray(v.sriov.vmIds) || !v.sriov.vmIds.every((x) => typeof x === 'string') || !isUnit(SRIOV_DEVICE_OPTIONS, v.sriov.devicesPerVm)) return null;
+    sriov = { vmIds: (v.sriov.vmIds as string[]).filter((id) => vms.some((x) => x.id === id)), devicesPerVm: v.sriov.devicesPerVm as SriovDevices };
+  }
   return {
     projectName,
     vms,
+    sriov,
     servers: { count: sc, cpu: scpu, ram: sram },
     cpuRatio: ratio,
     tolerance: tol,

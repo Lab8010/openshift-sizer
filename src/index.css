@@ -33,3 +33,34 @@ details[open] > summary .chevron {
     background: white;
   }
 }
+
+/* ネットワーク診断：クリックで解説が開く用語 */
+button.term {
+  display: inline;
+  padding: 0;
+  font: inherit;
+  color: inherit;
+  text-decoration: underline dotted;
+  text-decoration-thickness: 1.5px;
+  text-underline-offset: 3px;
+  text-decoration-color: rgb(100 116 139);
+  cursor: pointer;
+  border-radius: 2px;
+}
+button.term:hover,
+button.term[aria-expanded='true'] {
+  color: rgb(153 27 27);
+  text-decoration-color: rgb(185 28 28);
+  text-decoration-style: solid;
+}
+button.term:focus-visible {
+  outline: 2px solid rgb(185 28 28);
+  outline-offset: 2px;
+}
+
+@media print {
+  pre {
+    white-space: pre-wrap;
+    word-break: break-all;
+  }
+}

@@ -5,6 +5,9 @@ import { fieldDomId } from './domain/parse';
 import { largeSampleInput, sampleInput } from './domain/sample';
 import { emptySimple, parseSimple, sampleSimple, simpleHasContent, simpleToSizingInput, type SimpleInput } from './domain/simple';
 import { buildSimpleView } from './domain/simpleView';
+import { networkState, parseNetworkAnswers } from './domain/networkLink';
+import type { Answers } from './network/data/types';
+import { NetworkSection, type NetView } from './ui/NetworkSection';
 import { DISCLAIMER, PRODUCT } from './domain/sources';
 import { emptyInput, type SizingInput } from './domain/types';
 import { ErrorsContext, NaDatalist } from './ui/fields';
@@ -20,7 +23,7 @@ import { TopPage } from './ui/TopPage';
 const STORAGE_KEY = 'openshift-sizing-4.22-state';
 const LEGACY_KEY = 'openshift-sizing-4.22-input';
 
-type View = 'top' | 'wizard' | 'result' | 'detail' | 'sources';
+type View = 'top' | 'wizard' | 'result' | 'network' | 'detail' | 'sources';
 
 interface InitState {
   view: View;
@@ -28,17 +31,21 @@ interface InitState {
   print: boolean;
   simple: SimpleInput;
   detail: SizingInput;
+  network: Answers;
+  netView: NetView;
 }
 
 function initialState(): InitState {
   const params = new URLSearchParams(window.location.search);
-  const st: InitState = { view: 'top', step: 0, print: params.get('view') === 'report', simple: emptySimple(), detail: emptyInput() };
+  const st: InitState = { view: 'top', step: 0, print: params.get('view') === 'report', simple: emptySimple(), detail: emptyInput(), network: {}, netView: 'intro' };
   try {
     const saved = localStorage.getItem(STORAGE_KEY);
     if (saved) {
-      const data = JSON.parse(saved) as { simple?: unknown; detail?: unknown };
+      const data = JSON.parse(saved) as { simple?: unknown; detail?: unknown; network?: unknown };
       const s = parseSimple(data.simple);
       if (s) st.simple = s;
+      const n = parseNetworkAnswers(data.network);
+      if (n) st.network = n;
       if (data.detail) {
         const r = parseImport(JSON.stringify(data.detail));
         if (r.ok) st.detail = r.input;
@@ -67,7 +74,24 @@ function initialState(): InitState {
     }
   }
   const view = params.get('view');
-  if (view === 'wizard' || view === 'result' || view === 'sources') st.view = view;
+  if (view === 'wizard' || view === 'result' || view === 'sources' || view === 'network') st.view = view;
+  // 確認用：?net=sample でネットワーク診断のサンプル回答（パターン C、SR-IOV の検討あり）を入れる
+  if (params.get('net') === 'sample') {
+    st.network = {
+      q1: 'guest-ip-direct',
+      q2: 'outside',
+      q3: 'reuse-vlan',
+      q4: 'static-in-guest',
+      q5: 'l2-dependent',
+      q7: 'ip-must-persist',
+      q8: 'single',
+      q9: 'shared-many',
+      q10: 'policy-wanted',
+      q11: ['simple-legacy', 'high-performance'],
+    };
+  }
+  const nv = params.get('netview');
+  if (nv === 'intro' || nv === 'wizard' || nv === 'result' || nv === 'patterns' || nv === 'learn') st.netView = nv;
   const step = Number(params.get('step'));
   if (Number.isInteger(step) && step > 0) st.step = step - 1;
   return st;
@@ -79,6 +103,10 @@ export default function App() {
   const [step, setStep] = useState(init.step);
   const [simple, setSimple] = useState<SimpleInput>(init.simple);
   const [input, setInput] = useState<SizingInput>(init.detail);
+  const [netAnswers, setNetAnswers] = useState<Answers>(init.network);
+  const [netView, setNetView] = useState<NetView>(init.netView);
+  const [netIndex, setNetIndex] = useState(0);
+  const network = useMemo(() => networkState(netAnswers), [netAnswers]);
   const [tab, setTab] = useState<'input' | 'result'>('input');
   const [printView, setPrintView] = useState(init.print);
   const [message, setMessage] = useState<{ kind: 'ok' | 'error'; text: string; details?: string[] } | null>(null);
@@ -86,9 +114,12 @@ export default function App() {
 
   const mode: InputMode = view === 'detail' ? 'detail' : 'simple';
   // 簡易版は詳細版の入力モデルへ変換し、同じロジックで計算する
-  const effectiveInput = useMemo(() => (mode === 'simple' ? simpleToSizingInput(simple) : input), [mode, simple, input]);
+  const effectiveInput = useMemo(() => (mode === 'simple' ? simpleToSizingInput(simple, network.diagnosis) : input), [mode, simple, input, network]);
   const { result, errors } = useMemo(() => calculateSizing(effectiveInput), [effectiveInput]);
-  const simpleView = useMemo(() => buildSimpleView(simple, mode === 'simple' ? result : calculateSizing(simpleToSizingInput(simple)).result), [simple, mode, result]);
+  const simpleView = useMemo(
+    () => buildSimpleView(simple, mode === 'simple' ? result : calculateSizing(simpleToSizingInput(simple, network.diagnosis)).result),
+    [simple, mode, result, network],
+  );
   const errorMap = useMemo(() => {
     const m = new Map<string, string>();
     errors.forEach((e) => {
@@ -118,11 +149,11 @@ export default function App() {
     try {
       // 入力はこのブラウザ内だけに保存する（外部へは送信しない）
       const detail = buildExport(input, calculateSizing(input).result);
-      localStorage.setItem(STORAGE_KEY, JSON.stringify({ simple, detail }));
+      localStorage.setItem(STORAGE_KEY, JSON.stringify({ simple, detail, network: netAnswers }));
     } catch {
       // 保存できなくても計算は続ける
     }
-  }, [simple, input]);
+  }, [simple, input, netAnswers]);
 
   const go = (v: View) => {
     setView(v);
@@ -137,6 +168,13 @@ export default function App() {
     go('wizard');
   };
 
+  /** ネットワーク診断を開く。指定がなければ回答の状況に合わせて紹介・続き・結果のどれかを出す */
+  const openNetwork = (sub?: NetView) => {
+    const n = Object.keys(netAnswers).length;
+    setNetView(sub ?? (n === 0 ? 'intro' : network.complete ? 'result' : 'wizard'));
+    go('network');
+  };
+
   const openPrint = () => {
     setPrintView(true);
     // 印刷用ビューを描画してから印刷ダイアログを開く
@@ -144,7 +182,7 @@ export default function App() {
   };
 
   const exportJson = () => {
-    const file = buildExport(effectiveInput, result, new Date(), mode === 'simple' ? simple : undefined);
+    const file = buildExport(effectiveInput, result, new Date(), mode === 'simple' ? simple : undefined, netAnswers);
     const blob = new Blob([JSON.stringify(file, null, 2)], { type: 'application/json' });
     const a = document.createElement('a');
     const name = (effectiveInput.cluster.projectName || 'openshift-sizing').replace(/[\\/:*?"<>|\s]+/g, '_');
@@ -161,6 +199,7 @@ export default function App() {
       setMessage({ kind: 'error', text: 'JSON を読み込めませんでした。現在の入力はそのままです。', details: r.errors });
       return;
     }
+    setNetAnswers(r.networkAnswers);
     if (r.mode === 'simple' && r.simple) {
       setSimple(r.simple);
       setView('result');
@@ -173,7 +212,7 @@ export default function App() {
 
   const toDetail = () => {
     if (simpleHasContent(simple) && window.confirm('簡易版の回答を詳細入力に取り込みますか？（「キャンセル」で詳細入力の前回の内容を表示）')) {
-      setInput(simpleToSizingInput(simple));
+      setInput(simpleToSizingInput(simple, network.diagnosis));
       setTab('input');
     }
     go('detail');
@@ -206,7 +245,7 @@ export default function App() {
           </button>
           <span>印刷ダイアログで送信先を「PDF に保存」、用紙サイズを A4 にしてください。</span>
         </div>
-        <PrintReport input={effectiveInput} result={result} simple={mode === 'simple' ? { input: simple, view: simpleView } : undefined} />
+        <PrintReport input={effectiveInput} result={result} simple={mode === 'simple' ? { input: simple, view: simpleView } : undefined} network={network} />
       </div>
     );
   }
@@ -224,11 +263,14 @@ export default function App() {
           <div className="mx-auto flex max-w-5xl flex-wrap items-center gap-x-4 gap-y-1 px-4 py-3">
             <button type="button" onClick={() => go('top')} className="text-left">
               <span className="block text-sm font-bold text-slate-900">OpenShift Sizer</span>
-              <span className="hidden text-xs text-slate-500 sm:block">OpenShift Virtualization 4.22 のノードサイジング</span>
+              <span className="hidden text-xs text-slate-500 sm:block">OpenShift Virtualization 4.22 のサイジングとネットワーク診断</span>
             </button>
             <nav className="-mx-3 flex w-full shrink-0 gap-1 whitespace-nowrap text-sm sm:mx-0 sm:ml-auto sm:w-auto" aria-label="メイン">
               <button type="button" onClick={() => go(simpleHasContent(simple) ? 'result' : 'wizard')} className={navClass(view === 'wizard' || view === 'result')}>
                 サイジング
+              </button>
+              <button type="button" onClick={() => openNetwork()} className={navClass(view === 'network')}>
+                ネットワーク診断
               </button>
               <button type="button" onClick={toDetail} className={navClass(view === 'detail')}>
                 詳細入力
@@ -276,6 +318,7 @@ export default function App() {
               }}
               onDetail={toDetail}
               onImport={() => fileRef.current?.click()}
+              onNetwork={() => openNetwork()}
             />
           )}
           {view === 'wizard' && <SizingWizard simple={simple} update={updateSimple} index={step} onIndexChange={setStep} onDone={() => go('result')} onExit={() => go('top')} />}
@@ -293,6 +336,24 @@ export default function App() {
               onPrint={openPrint}
               onExport={exportJson}
               onDetail={toDetail}
+              network={network}
+              onDiagnose={() => openNetwork()}
+              onOpenNetwork={() => openNetwork('result')}
+            />
+          )}
+          {view === 'network' && (
+            <NetworkSection
+              network={network}
+              onAnswersChange={setNetAnswers}
+              view={netView}
+              onViewChange={setNetView}
+              index={netIndex}
+              onIndexChange={setNetIndex}
+              hasSizing={simpleHasContent(simple)}
+              onToSizing={() => {
+                if (simpleHasContent(simple)) go('result');
+                else start();
+              }}
             />
           )}
           {view === 'sources' && <SourcesPage result={result} />}
@@ -361,7 +422,7 @@ export default function App() {
                   </p>
                 </div>
                 <div role="tabpanel" id="panel-result" aria-labelledby="tab-result" hidden={tab !== 'result'}>
-                  <ResultsView result={result} />
+                  <ResultsView result={result} network={network} />
                 </div>
               </div>
               </div>

@@ -5,6 +5,8 @@ import { AssumptionList, Legend, OpenItemsList, SectionView, SourcesList, Summar
 import type { SimpleInput } from '../domain/simple';
 import { SIMPLE_GROUP_IDS, type SimpleView } from '../domain/simpleView';
 import { SimpleTables, SimpleVerdict, simpleOpenItems } from './SimpleResults';
+import type { NetworkState } from '../domain/networkLink';
+import { NetworkReportSection } from './NetworkPanels';
 
 const v = (raw: string) => (raw.trim() === '' ? '未入力' : raw);
 const q = (x: Qty<string>) => (x.raw.trim() === '' ? '未入力' : `${x.raw} ${x.unit}`);
@@ -16,8 +18,8 @@ function fmtDate(iso: string): string {
 
 const ROLE_LABEL: Record<RoleKey, string> = { controlPlane: 'コントロールプレーン', compute: 'コンピュート', infra: 'インフラ' };
 
-export function PrintReport({ input, result, simple }: { input: SizingInput; result: SizingResult; simple?: { input: SimpleInput; view: SimpleView } }) {
-  if (simple) return <SimpleReport input={input} result={result} simple={simple} />;
+export function PrintReport({ input, result, simple, network }: { input: SizingInput; result: SizingResult; simple?: { input: SimpleInput; view: SimpleView }; network?: NetworkState }) {
+  if (simple) return <SimpleReport input={input} result={result} simple={simple} network={network} />;
   const backendName = (id: string) => input.backends.find((b) => b.id === id)?.name || '未指定';
   return (
     <article className="report" lang="ja">
@@ -65,9 +67,10 @@ export function PrintReport({ input, result, simple }: { input: SizingInput; res
         <Legend />
       </section>
 
+      {network && <NetworkReportSection network={network} heading="2. ネットワーク構成（診断結果）" />}
       <section>
-        <h2>2. 入力と前提</h2>
-        <h3>2.1 ゲスト VM プロファイル（ゲスト VM のスペック）</h3>
+        <h2>3. 入力と前提</h2>
+        <h3>3.1 ゲスト VM プロファイル（ゲスト VM のスペック）</h3>
         <table className="data input-table">
           <colgroup>
             {[12, 10, 13, 7, 7, 15, 22, 14].map((w, i) => (
@@ -128,7 +131,7 @@ export function PrintReport({ input, result, simple }: { input: SizingInput; res
           </tbody>
         </table>
 
-        <h3>2.2 候補ノード（OpenShift ノードのスペック、1 台あたり）</h3>
+        <h3>3.2 候補ノード（OpenShift ノードのスペック、1 台あたり）</h3>
         <table className="data input-table">
           <thead>
             <tr>
@@ -196,7 +199,7 @@ export function PrintReport({ input, result, simple }: { input: SizingInput; res
           {v(input.cpMetrics.fsyncMs)} ms、p99 RTT {v(input.cpMetrics.rttMs)} ms。
         </p>
 
-        <h3>2.3 インフラサービス</h3>
+        <h3>3.3 インフラサービス</h3>
         <table className="data input-table">
           <thead>
             <tr>
@@ -239,7 +242,7 @@ export function PrintReport({ input, result, simple }: { input: SizingInput; res
           </tbody>
         </table>
 
-        <h3>2.4 可用性・移行、ネットワーク、ストレージ</h3>
+        <h3>3.4 可用性・移行、ネットワーク、ストレージ</h3>
         <p className="small">
           同時 drain {v(input.availability.computeDrain)} 台、同時移行 {input.availability.parallelMigrations || '既定 5'} 件／ノードごと {input.availability.parallelPerNode || '既定 2'} 件、目標時間{' '}
           {v(input.availability.migrationTargetSec)} 秒、メモリ更新速度 {q(input.availability.dirtyRate)}、実測転送量 {q(input.availability.measuredTransfer)}、CPU 互換性 {tri(input.availability.cpuModelCompatible)}、配置制約{' '}
@@ -301,12 +304,12 @@ export function PrintReport({ input, result, simple }: { input: SizingInput; res
             </tbody>
           </table>
         )}
-        <h3>2.5 前提と仮定</h3>
+        <h3>3.5 前提と仮定</h3>
         <AssumptionList result={result} />
       </section>
 
       <section>
-        <h2>3. 容量・性能・帯域の内訳</h2>
+        <h2>4. 容量・性能・帯域の内訳</h2>
         {result.groups.map((g) => (
           <div key={g.id} className="report-group">
             <h3>{g.title}</h3>
@@ -318,12 +321,12 @@ export function PrintReport({ input, result, simple }: { input: SizingInput; res
       </section>
 
       <section>
-        <h2>4. 未確認事項・要対応（{result.openItems.length} 件）</h2>
+        <h2>5. 未確認事項・要対応（{result.openItems.length} 件）</h2>
         <OpenItemsList result={result} />
       </section>
 
       <section>
-        <h2>5. 出典一覧</h2>
+        <h2>6. 出典一覧</h2>
         <p className="small">すべて Red Hat の 4.22 版公式資料です。章節番号は各資料ページ内の番号です。</p>
         <SourcesList result={result} />
       </section>
@@ -363,7 +366,7 @@ function ReportHead({ input, result, title }: { input: SizingInput; result: Sizi
   );
 }
 
-function SimpleReport({ input, result, simple }: { input: SizingInput; result: SizingResult; simple: { input: SimpleInput; view: SimpleView } }) {
+function SimpleReport({ input, result, simple, network }: { input: SizingInput; result: SizingResult; simple: { input: SimpleInput; view: SimpleView }; network?: NetworkState }) {
   const s = simple.input;
   const filtered = simpleOpenItems(result);
   return (
@@ -375,9 +378,10 @@ function SimpleReport({ input, result, simple }: { input: SizingInput; result: S
         <SimpleTables view={simple.view} />
         <Legend />
       </section>
+      {network && <NetworkReportSection network={network} heading="2. ネットワーク構成（診断結果）" />}
       <section>
-        <h2>2. 入力と前提</h2>
-        <h3>2.1 仮想マシン（ゲスト VM のスペック）</h3>
+        <h2>3. 入力と前提</h2>
+        <h3>3.1 仮想マシン（ゲスト VM のスペック）</h3>
         <table className="data input-table">
           <thead>
             <tr>
@@ -400,7 +404,7 @@ function SimpleReport({ input, result, simple }: { input: SizingInput; result: S
             ))}
           </tbody>
         </table>
-        <h3>2.2 VM 用の物理サーバとクラスタ構成</h3>
+        <h3>3.2 VM 用の物理サーバとクラスタ構成</h3>
         <table className="data input-table">
           <tbody>
             <tr>
@@ -437,11 +441,11 @@ function SimpleReport({ input, result, simple }: { input: SizingInput; result: S
             </tr>
           </tbody>
         </table>
-        <h3>2.3 前提と仮定</h3>
+        <h3>3.3 前提と仮定</h3>
         <AssumptionList result={result} />
       </section>
       <section>
-        <h2>3. 計算の内訳</h2>
+        <h2>4. 計算の内訳</h2>
         {result.groups
           .filter((g) => SIMPLE_GROUP_IDS.includes(g.id))
           .map((g) => (
@@ -454,12 +458,12 @@ function SimpleReport({ input, result, simple }: { input: SizingInput; result: S
           ))}
       </section>
       <section>
-        <h2>4. 確認事項（{filtered.openItems.length} 件）</h2>
+        <h2>5. 確認事項（{filtered.openItems.length} 件）</h2>
         <p className="small">ネットワーク・ストレージ性能・監視などの確認項目は、詳細版で入力・確認できます。</p>
         <OpenItemsList result={filtered} />
       </section>
       <section>
-        <h2>5. 出典一覧</h2>
+        <h2>6. 出典一覧</h2>
         <p className="small">すべて Red Hat の 4.22 版公式資料です。章節番号は各資料ページ内の番号です。</p>
         <SourcesList result={result} />
       </section>
