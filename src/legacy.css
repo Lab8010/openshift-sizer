@@ -1,48 +1,44 @@
-:root {
-  --fg: #151515;
-  --muted: #4d4d4d;
-  --line: #c7c7c7;
-  --bg: #f5f5f5;
+/* 詳細版と印刷レポート用のスタイル（.legacy の中だけに適用） */
+
+.legacy {
+  --fg: #1e293b;
+  --muted: #64748b;
+  --line: #e2e8f0;
+  --bg: #fafaf9;
   --card: #ffffff;
-  --accent: #b50000;
-  --focus: #0066cc;
+  --accent: #b91c1c;
+  --focus: #b91c1c;
   --ok: #1e6b1e;
   --ng: #a30000;
   --warn: #7a4b00;
   --info: #2a4d7a;
-  font-family: 'Hiragino Sans', 'Hiragino Kaku Gothic ProN', 'Noto Sans JP', 'Yu Gothic UI', 'Yu Gothic', Meiryo, system-ui, sans-serif;
+  font-family: 'Red Hat Text', 'Hiragino Sans', 'Hiragino Kaku Gothic ProN', 'Noto Sans JP', 'Yu Gothic UI', Meiryo, system-ui, sans-serif;
   color: var(--fg);
   background: var(--bg);
   line-height: 1.6;
   font-size: 15px;
 }
 
-* {
+.legacy * {
   box-sizing: border-box;
 }
 
-body {
-  margin: 0;
-}
 
-h1,
-h2,
-h3,
-h4 {
+
+.legacy h1, .legacy h2, .legacy h3, .legacy h4 {
   line-height: 1.35;
 }
 
-a {
+.legacy a {
   color: #0047a3;
 }
 
-:focus-visible {
+.legacy :focus-visible {
   outline: 3px solid var(--focus);
   outline-offset: 2px;
 }
 
-.sr-only,
-.sr-label > label {
+.legacy .sr-only, .legacy .sr-label > label {
   position: absolute !important;
   width: 1px;
   height: 1px;
@@ -54,11 +50,12 @@ a {
   border: 0;
 }
 
-.skip {
+.legacy .skip {
   position: absolute;
   left: -9999px;
 }
-.skip:focus {
+
+.legacy .skip:focus {
   left: 8px;
   top: 8px;
   background: #fff;
@@ -66,7 +63,7 @@ a {
   z-index: 10;
 }
 
-button {
+.legacy button {
   font: inherit;
   padding: 6px 12px;
   border: 1px solid #8a8a8a;
@@ -74,23 +71,28 @@ button {
   background: #fff;
   cursor: pointer;
 }
-button:hover {
+
+.legacy button:hover {
   background: #f0f0f0;
 }
-button:disabled {
+
+.legacy button:disabled {
   opacity: 0.5;
   cursor: not-allowed;
 }
-button.primary {
+
+.legacy button.primary {
   background: var(--accent);
   border-color: var(--accent);
   color: #fff;
   font-weight: 600;
 }
-button.primary:hover {
+
+.legacy button.primary:hover {
   background: #8f0000;
 }
-button.link {
+
+.legacy button.link {
   border: none;
   background: none;
   color: #0047a3;
@@ -98,13 +100,12 @@ button.link {
   padding: 0;
   text-align: left;
 }
-button.add {
+
+.legacy button.add {
   margin-top: 8px;
 }
 
-input[type='text'],
-select,
-textarea {
+.legacy input[type='text'], .legacy select, .legacy textarea {
   font: inherit;
   padding: 5px 8px;
   border: 1px solid #8a8a8a;
@@ -112,12 +113,13 @@ textarea {
   background: #fff;
   min-width: 0;
 }
-input[aria-invalid='true'] {
+
+.legacy input[aria-invalid='true'] {
   border: 2px solid var(--ng);
   background: #fff5f5;
 }
 
-.app-header {
+.legacy .app-header {
   display: flex;
   flex-wrap: wrap;
   justify-content: space-between;
@@ -127,77 +129,88 @@ input[aria-invalid='true'] {
   background: #fff;
   border-bottom: 3px solid var(--accent);
 }
-.app-header h1 {
+
+.legacy .app-header h1 {
   margin: 0;
   font-size: 1.4rem;
 }
-.app-header .sub {
+
+.legacy .app-header .sub {
   margin: 0;
   color: var(--muted);
   font-size: 0.85rem;
 }
-.toolbar {
+
+.legacy .toolbar {
   display: flex;
   flex-wrap: wrap;
   gap: 6px;
 }
 
-.disclaimer {
+.legacy .disclaimer {
   margin: 0;
   padding: 8px 20px;
   background: #eef3f8;
   border-bottom: 1px solid #9fb6cc;
   font-size: 0.88rem;
 }
-.report .disclaimer {
+
+.legacy .report .disclaimer {
   border: 1px solid #000;
   background: none;
   padding: 4px 8px;
   margin: 6px 0;
   font-size: 8.5pt;
 }
-.sample-banner {
+
+.legacy .sample-banner {
   margin: 0;
   padding: 6px 20px;
   background: #fff8e0;
   border-bottom: 1px solid #e0c060;
 }
 
-.message {
+.legacy .message {
   margin: 10px 20px;
   padding: 10px 14px;
   border-radius: 4px;
   border: 1px solid;
 }
-.message p {
+
+.legacy .message p {
   margin: 0 0 4px;
 }
-.message-ok {
+
+.legacy .message-ok {
   border-color: var(--ok);
   background: #f0f8f0;
 }
-.message-error {
+
+.legacy .message-error {
   border-color: var(--ng);
   background: #fff3f3;
 }
 
-.tabs {
+.legacy .tabs {
   display: flex;
   gap: 4px;
   padding: 10px 20px 0;
 }
-.tabs [role='tab'] {
+
+.legacy .tabs [role='tab'] {
   border-radius: 6px 6px 0 0;
   border-bottom: none;
   padding: 8px 18px;
   font-weight: 600;
 }
-.tabs [role='tab'][aria-selected='true'] {
+
+.legacy .tabs [role='tab'][aria-selected='true'] {
   background: var(--card);
   border-color: var(--accent);
   border-width: 2px 2px 0;
 }
-.tabs .count {
+
+.legacy .tabs .count {
   margin-left: 8px;
   font-size: 0.75rem;
   background: var(--ng);
@@ -205,50 +218,56 @@ input[aria-invalid='true'] {
   padding: 1px 6px;
   border-radius: 10px;
 }
-.tabs .count.muted {
+
+.legacy .tabs .count.muted {
   background: #666;
 }
 
-main {
+.legacy main {
   padding: 0 20px 40px;
 }
 
-.error-summary {
+.legacy .error-summary {
   border: 2px solid var(--ng);
   background: #fff;
   padding: 10px 16px;
   margin: 12px 0;
 }
-.error-summary h2 {
+
+.legacy .error-summary h2 {
   margin: 0 0 6px;
   font-size: 1.05rem;
   color: var(--ng);
 }
 
-.lead {
+.legacy .lead {
   background: #fff;
   border-left: 4px solid var(--accent);
   padding: 10px 14px;
 }
 
-.card {
+.legacy .card {
   background: var(--card);
   border: 1px solid var(--line);
   border-radius: 6px;
   padding: 12px 16px 16px;
   margin: 14px 0;
 }
-.card h2 {
+
+.legacy .card h2 {
   margin: 0 0 8px;
   font-size: 1.15rem;
 }
-.card-guest {
+
+.legacy .card-guest {
   border-top: 4px solid #3d6b99;
 }
-.card-node {
+
+.legacy .card-node {
   border-top: 4px solid #6b6b6b;
 }
-.tag {
+
+.legacy .tag {
   display: inline-block;
   font-size: 0.75rem;
   padding: 1px 8px;
@@ -257,192 +276,210 @@ main {
   vertical-align: middle;
   color: #fff;
 }
-.tag-guest {
+
+.legacy .tag-guest {
   background: #3d6b99;
 }
-.tag-node {
+
+.legacy .tag-node {
   background: #555;
 }
 
-.grid {
+.legacy .grid {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(230px, 1fr));
   gap: 10px 16px;
 }
-.span2 {
+
+.legacy .span2 {
   grid-column: span 2;
 }
 
-.field {
+.legacy .field {
   display: flex;
   flex-direction: column;
   gap: 2px;
 }
-.field > label {
+
+.legacy .field > label {
   font-size: 0.85rem;
   font-weight: 600;
 }
-.field .input-row {
+
+.legacy .field .input-row {
   display: flex;
   gap: 4px;
   align-items: center;
 }
-.field .input-row input {
+
+.legacy .field .input-row input {
   flex: 1 1 auto;
   width: 100%;
 }
-.field .input-row select {
+
+.legacy .field .input-row select {
   flex: 0 0 auto;
   width: 6.2em;
 }
-.field .suffix {
+
+.legacy .field .suffix {
   font-size: 0.85rem;
   color: var(--muted);
   white-space: nowrap;
 }
-.field.check {
+
+.legacy .field.check {
   flex-direction: row;
   flex-wrap: wrap;
   align-items: center;
   gap: 6px;
 }
-.field.check > label {
+
+.legacy .field.check > label {
   font-weight: 400;
   flex: 1 1 0;
   min-width: 0;
 }
-.field.check .hint {
+
+.legacy .field.check .hint {
   flex-basis: 100%;
 }
-.field.mini {
+
+.legacy .field.mini {
   font-size: 0.8rem;
 }
-.hint {
+
+.legacy .hint {
   font-size: 0.78rem;
   color: var(--muted);
 }
-.error {
+
+.legacy .error {
   font-size: 0.8rem;
   color: var(--ng);
   font-weight: 600;
 }
 
-fieldset {
+.legacy fieldset {
   border: 1px solid var(--line);
   border-radius: 4px;
   margin: 10px 0;
   padding: 8px 12px 12px;
 }
-legend {
+
+.legacy legend {
   font-weight: 700;
   padding: 0 6px;
 }
-details.sub {
+
+.legacy details.sub {
   margin-top: 10px;
 }
-details.sub > summary,
-.detail-row summary {
+
+.legacy details.sub > summary, .legacy .detail-row summary {
   cursor: pointer;
   font-weight: 600;
   color: #0047a3;
 }
 
-.table-wrap {
+.legacy .table-wrap {
   overflow-x: auto;
 }
-.vm-table,
-.net-table {
+
+.legacy .vm-table, .legacy .net-table {
   border-collapse: collapse;
   width: 100%;
   min-width: 900px;
 }
-.vm-table th,
-.net-table th {
+
+.legacy .vm-table th, .legacy .net-table th {
   text-align: left;
   font-size: 0.82rem;
   padding: 4px 6px;
   border-bottom: 2px solid var(--line);
 }
-.vm-table td,
-.net-table td,
-.net-table tbody th {
+
+.legacy .vm-table td, .legacy .net-table td, .legacy .net-table tbody th {
   padding: 4px 6px;
   vertical-align: top;
 }
-.vm-table .detail-row td {
+
+.legacy .vm-table .detail-row td {
   border-bottom: 1px solid var(--line);
   padding-bottom: 8px;
 }
-.vm-table .ops {
+
+.legacy .vm-table .ops {
   white-space: nowrap;
 }
-.vm-table .ops button {
+
+.legacy .vm-table .ops button {
   margin-right: 4px;
   font-size: 0.85rem;
   padding: 4px 8px;
 }
-.vm-detail fieldset {
+
+.legacy .vm-detail fieldset {
   background: #fafafa;
 }
 
-.to-result {
+.legacy .to-result {
   text-align: right;
 }
 
 /* ---- 結果 ---- */
-.results h2 {
+.legacy .results h2 {
   font-size: 1.2rem;
   margin: 22px 0 8px;
   border-bottom: 2px solid var(--line);
   padding-bottom: 4px;
 }
-.warn-box {
+
+.legacy .warn-box {
   border: 2px solid var(--warn);
   background: #fffaf0;
   padding: 8px 12px;
 }
-.key-metrics {
+
+.legacy .key-metrics {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
   gap: 10px;
   margin-top: 12px;
 }
-.metric {
+
+.legacy .metric {
   background: #fff;
   border: 1px solid var(--line);
   border-radius: 6px;
   padding: 10px 12px;
 }
-.m-label {
+
+.legacy .m-label {
   font-size: 0.82rem;
   color: var(--muted);
 }
-.m-value {
+
+.legacy .m-value {
   font-size: 1.05rem;
   font-weight: 700;
   margin: 2px 0 4px;
   overflow-wrap: anywhere;
 }
 
-table.summary,
-table.items,
-table.data {
+.legacy table.summary, .legacy table.items, .legacy table.data {
   border-collapse: collapse;
   width: 100%;
   background: #fff;
 }
-table.summary caption,
-table.data caption {
+
+.legacy table.summary caption, .legacy table.data caption {
   text-align: left;
   font-weight: 700;
   padding: 4px 0;
 }
-table.summary th,
-table.summary td,
-table.items th,
-table.items td,
-table.data th,
-table.data td {
+
+.legacy table.summary th, .legacy table.summary td, .legacy table.items th, .legacy table.items td, .legacy table.data th, .legacy table.data td {
   border: 1px solid var(--line);
   padding: 4px 6px;
   vertical-align: top;
@@ -451,72 +488,85 @@ table.data td {
   word-break: normal;
   font-size: 0.86rem;
 }
-table.summary thead th,
-table.items thead th,
-table.data thead th {
+
+.legacy table.summary thead th, .legacy table.items thead th, .legacy table.data thead th {
   background: #ececec;
   font-weight: 700;
 }
-table.items tbody th {
+
+.legacy table.items tbody th {
   font-weight: 500;
 }
-table.items col.c-label {
+
+.legacy table.items col.c-label {
   width: 34%;
 }
-table.items col.c-val {
+
+.legacy table.items col.c-val {
   width: 36%;
 }
-table.items col.c-kind {
+
+.legacy table.items col.c-kind {
   width: 12%;
 }
-table.items col.c-status {
+
+.legacy table.items col.c-status {
   width: 11%;
 }
-table.items col.c-btn {
+
+.legacy table.items col.c-btn {
   width: 7%;
 }
-table.items .val {
+
+.legacy table.items .val {
   font-variant-numeric: tabular-nums;
 }
-.bk-row td {
+
+.legacy .bk-row td {
   background: #fafafa;
 }
-.breakdown p {
+
+.legacy .breakdown p {
   margin: 2px 0;
   font-size: 0.8rem;
 }
-.bk-label {
+
+.legacy .bk-label {
   font-weight: 700;
 }
-.breakdown .missing {
+
+.legacy .breakdown .missing {
   color: var(--warn);
 }
-.refs .ref {
+
+.legacy .refs .ref {
   margin-right: 6px;
   white-space: nowrap;
 }
 
-.group {
+.legacy .group {
   background: #fff;
   border: 1px solid var(--line);
   border-radius: 6px;
   margin: 10px 0;
   padding: 4px 12px 10px;
 }
-.group > summary {
+
+.legacy .group > summary {
   cursor: pointer;
 }
-.group > summary h3 {
+
+.legacy .group > summary h3 {
   display: inline;
   font-size: 1.05rem;
 }
-.section h4 {
+
+.legacy .section h4 {
   margin: 12px 0 4px;
   font-size: 0.95rem;
 }
 
-.status,
-.kind {
+.legacy .status, .legacy .kind {
   display: inline-block;
   font-size: 0.75rem;
   padding: 0 6px;
@@ -524,86 +574,101 @@ table.items .val {
   white-space: nowrap;
   line-height: 1.6;
 }
-.kind {
+
+.legacy .kind {
   border: 1px solid #999;
   color: #333;
   background: #fff;
 }
-.kind-official_min,
-.kind-official_rec,
-.kind-official_default {
+
+.legacy .kind-official_min, .legacy .kind-official_rec, .legacy .kind-official_default {
   border-color: #3d6b99;
   color: #1e3d5c;
   font-weight: 600;
 }
-.kind-assumption,
-.kind-sample {
+
+.legacy .kind-assumption, .legacy .kind-sample {
   border-style: dashed;
 }
-.status {
+
+.legacy .status {
   border: 1px solid currentColor;
   font-weight: 600;
 }
-.status-ok {
+
+.legacy .status-ok {
   color: var(--ok);
 }
-.status-ng {
+
+.legacy .status-ng {
   color: #fff;
   background: var(--ng);
   border-color: var(--ng);
 }
-.status-calculated {
+
+.legacy .status-calculated {
   color: #333;
 }
-.status-not_calculated {
+
+.legacy .status-not_calculated {
   color: var(--warn);
   border-style: dotted;
 }
-.status-unconfirmed {
+
+.legacy .status-unconfirmed {
   color: var(--warn);
   border-style: dashed;
 }
-.status-individual {
+
+.legacy .status-individual {
   color: #6a1b6a;
   border-width: 2px;
 }
-.status-na {
+
+.legacy .status-na {
   color: #777;
   font-weight: 400;
 }
-.status-info {
+
+.legacy .status-info {
   color: var(--info);
   font-weight: 400;
 }
 
-.legend {
+.legacy .legend {
   font-size: 0.78rem;
   color: var(--muted);
 }
-.legend p {
+
+.legacy .legend p {
   margin: 2px 0;
 }
-.legend-item {
+
+.legacy .legend-item {
   margin-right: 10px;
   white-space: nowrap;
 }
-.assumptions {
+
+.legacy .assumptions {
   padding-left: 1.2em;
 }
-.assumptions li {
+
+.legacy .assumptions li {
   margin: 3px 0;
 }
-td.url {
+
+.legacy td.url {
   overflow-wrap: anywhere;
   word-break: break-all;
 }
 
 /* ---- 印刷用ビュー ---- */
-.print-view {
+.legacy .print-view {
   background: #fff;
   min-height: 100vh;
 }
-.print-toolbar {
+
+.legacy .print-toolbar {
   position: sticky;
   top: 0;
   display: flex;
@@ -615,93 +680,109 @@ td.url {
   font-size: 0.85rem;
   z-index: 5;
 }
-.report {
+
+.legacy .report {
   max-width: 190mm;
   margin: 0 auto;
   padding: 10mm 0;
   font-size: 9.5pt;
 }
-.report h1 {
+
+.legacy .report h1 {
   font-size: 17pt;
   margin: 0 0 6px;
   border-bottom: 2px solid #000;
 }
-.report h2 {
+
+.legacy .report h2 {
   font-size: 13pt;
   margin: 14px 0 6px;
   border-bottom: 1px solid #000;
 }
-.report h3 {
+
+.legacy .report h3 {
   font-size: 11pt;
   margin: 10px 0 4px;
 }
-.report h4 {
+
+.legacy .report h4 {
   font-size: 10pt;
   margin: 8px 0 3px;
 }
-.report table.meta th {
+
+.legacy .report table.meta th {
   text-align: left;
   padding-right: 12px;
 }
-.report .sample-note {
+
+.legacy .report .sample-note {
   font-weight: 700;
 }
-.report .scope-note,
-.report .small {
+
+.legacy .report .scope-note, .legacy .report .small {
   font-size: 8.5pt;
 }
-.report table.summary th,
-.report table.summary td,
-.report table.items th,
-.report table.items td,
-.report table.data th,
-.report table.data td {
+
+.legacy .report table.summary th, .legacy .report table.summary td, .legacy .report table.items th, .legacy .report table.items td, .legacy .report table.data th, .legacy .report table.data td {
   font-size: 7.6pt;
   padding: 2px 3px;
 }
-.report table {
+
+.legacy .report table {
   table-layout: fixed;
 }
-.report .table-wrap {
+
+.legacy .report .table-wrap {
   overflow: visible;
 }
-.report table.items col.c-label {
+
+.legacy .report table.items col.c-label {
   width: 33%;
 }
-.report table.items col.c-val {
+
+.legacy .report table.items col.c-val {
   width: 40%;
 }
-.report table.items col.c-kind {
+
+.legacy .report table.items col.c-kind {
   width: 14%;
 }
-.report table.items col.c-status {
+
+.legacy .report table.items col.c-status {
   width: 13%;
 }
-.report .breakdown p {
+
+.legacy .report .breakdown p {
   font-size: 7pt;
 }
-.report .status,
-.report .kind {
+
+.legacy .report .status, .legacy .report .kind {
   font-size: 6.8pt;
   padding: 0 3px;
   white-space: normal;
 }
-.report table.sources col.s-id {
+
+.legacy .report table.sources col.s-id {
   width: 14%;
 }
-.report table.sources col.s-title {
+
+.legacy .report table.sources col.s-title {
   width: 25%;
 }
-.report table.sources col.s-sec {
+
+.legacy .report table.sources col.s-sec {
   width: 23%;
 }
-.report table.sources col.s-url {
+
+.legacy .report table.sources col.s-url {
   width: 38%;
 }
-.report table.summary {
+
+.legacy .report table.summary {
   margin-bottom: 6px;
 }
-.report .input-table {
+
+.legacy .report .input-table {
   margin-bottom: 6px;
 }
 
@@ -711,52 +792,58 @@ td.url {
 }
 
 @media print {
-  :root {
+.legacy {
     background: #fff;
   }
-  .noprint,
-  .print-toolbar {
+
+.legacy .noprint, .legacy .print-toolbar {
     display: none !important;
   }
-  .report {
+
+.legacy .report {
     max-width: none;
     padding: 0;
   }
-  .report a {
+
+.legacy .report a {
     color: #000;
   }
-  .report table {
+
+.legacy .report table {
     page-break-inside: auto;
   }
-  .report tr,
-  .report .bk-row {
+
+.legacy .report tr, .legacy .report .bk-row {
     page-break-inside: avoid;
     break-inside: avoid;
   }
-  .report thead {
+
+.legacy .report thead {
     display: table-header-group;
   }
-  .report h2,
-  .report h3,
-  .report h4 {
+
+.legacy .report h2, .legacy .report h3, .legacy .report h4 {
     page-break-after: avoid;
     break-after: avoid;
   }
-  .status,
-  .kind {
+
+.legacy .status, .legacy .kind {
     -webkit-print-color-adjust: exact;
     print-color-adjust: exact;
   }
+
+
 }
 
 /* ---- 簡易版・詳細版 ---- */
-.mode-switch {
+.legacy .mode-switch {
   display: inline-flex;
   border: 2px solid var(--accent);
   border-radius: 6px;
   overflow: hidden;
 }
-.mode-switch button {
+
+.legacy .mode-switch button {
   border: none;
   border-radius: 0;
   padding: 6px 18px;
@@ -764,15 +851,18 @@ td.url {
   background: #fff;
   color: var(--accent);
 }
-.mode-switch button[aria-pressed='true'] {
+
+.legacy .mode-switch button[aria-pressed='true'] {
   background: var(--accent);
   color: #fff;
 }
-.page-pad {
+
+.legacy .page-pad {
   margin-left: 20px;
   margin-right: 20px;
 }
-.import-banner {
+
+.legacy .import-banner {
   margin-top: 10px;
   padding: 8px 12px;
   border: 1px dashed #3d6b99;
@@ -782,127 +872,184 @@ td.url {
   gap: 10px;
   align-items: center;
 }
-.simple-layout {
+
+.legacy .simple-layout {
   display: grid;
   grid-template-columns: minmax(0, 6fr) minmax(0, 5fr);
   gap: 20px;
   align-items: start;
   padding-top: 4px;
 }
+
 @media (max-width: 1100px) {
-  .simple-layout {
+.legacy .simple-layout {
     grid-template-columns: minmax(0, 1fr);
   }
+
+
 }
-.simple-output {
+
+.legacy .simple-output {
   position: sticky;
   top: 8px;
   max-height: calc(100vh - 16px);
   overflow-y: auto;
   padding-right: 4px;
 }
+
 @media (max-width: 1100px) {
-  .simple-output {
+.legacy .simple-output {
     position: static;
     max-height: none;
     overflow: visible;
   }
+
+
 }
-.simple-results h2:first-child {
+
+.legacy .simple-results h2:first-child {
   margin-top: 14px;
 }
-.grid.compact {
+
+.legacy .grid.compact {
   grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
   margin-top: 10px;
 }
-.simple-vm-table {
+
+.legacy .simple-vm-table {
   border-collapse: collapse;
   width: 100%;
   min-width: 600px;
   table-layout: fixed;
 }
-.simple-vm-table .field .input-row input {
+
+.legacy .simple-vm-table .field .input-row input {
   min-width: 2.5em;
   padding-left: 5px;
   padding-right: 5px;
 }
-.simple-vm-table .field .input-row select {
+
+.legacy .simple-vm-table .field .input-row select {
   width: 4.6em;
   padding-left: 4px;
   padding-right: 2px;
 }
-.simple-vm-table th {
+
+.legacy .simple-vm-table th {
   white-space: nowrap;
 }
-.simple-vm-table th {
+
+.legacy .simple-vm-table th {
   text-align: left;
   font-size: 0.82rem;
   padding: 4px;
   border-bottom: 2px solid var(--line);
 }
-.simple-vm-table td {
+
+.legacy .simple-vm-table td {
   padding: 3px 4px;
   vertical-align: top;
 }
-.simple-vm-table .ops {
+
+.legacy .simple-vm-table .ops {
   white-space: nowrap;
 }
-.simple-vm-table .ops button {
+
+.legacy .simple-vm-table .ops button {
   font-size: 0.8rem;
   padding: 3px 6px;
   margin-right: 2px;
 }
-.assumptions-card > summary {
+
+.legacy .assumptions-card > summary {
   cursor: pointer;
   font-weight: 700;
 }
-.verdict {
+
+.legacy .verdict {
   border: 2px solid #555;
   border-radius: 6px;
   background: #fff;
   padding: 10px 14px;
   margin: 10px 0 14px;
 }
-.verdict-head {
+
+.legacy .verdict-head {
   display: flex;
   gap: 10px;
   align-items: center;
   font-size: 1.15rem;
 }
-.verdict ul {
+
+.legacy .verdict ul {
   margin: 6px 0 0;
   padding-left: 1.2em;
   font-size: 0.88rem;
 }
-.verdict-ok,
-.verdict-calculated {
+
+.legacy .verdict-ok, .legacy .verdict-calculated {
   border-color: var(--ok);
 }
-.verdict-ng {
+
+.legacy .verdict-ng {
   border-color: var(--ng);
   border-width: 3px;
 }
-.verdict-not_calculated,
-.verdict-unconfirmed,
-.verdict-individual {
+
+.legacy .verdict-not_calculated, .legacy .verdict-unconfirmed, .legacy .verdict-individual {
   border-color: var(--warn);
   border-style: dashed;
 }
-.row-note {
+
+.legacy .row-note {
   font-size: 0.76rem;
   color: var(--muted);
   margin-top: 2px;
 }
-.report .verdict-head {
+
+.legacy .report .verdict-head {
   font-size: 11pt;
 }
-.report .verdict ul,
-.report .row-note {
+
+.legacy .report .verdict ul, .legacy .report .row-note {
   font-size: 7.5pt;
 }
-.report .simple-items col.c-label {
+
+.legacy .report .simple-items col.c-label {
   width: 30%;
 }
-.report .simple-items col.c-val {
+
+.legacy .report .simple-items col.c-val {
   width: 44%;
+}
+
+
+.legacy h1,
+.legacy h2,
+.legacy h3,
+.legacy h4 {
+  font-weight: 700;
+}
+.legacy ul {
+  list-style: disc;
+  padding-left: 1.2em;
+}
+.legacy a {
+  text-decoration: underline;
+}
+.legacy p {
+  margin: 0.5em 0;
+}
+.legacy table caption {
+  caption-side: top;
+}
+
+.legacy .detail-main {
+  padding: 0 20px 40px;
+}
+.legacy {
+  background: transparent;
+}
+.legacy.print-view {
+  background: #fff;
 }

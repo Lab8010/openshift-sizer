@@ -3,7 +3,7 @@ import { calculateSizing } from '../src/domain/calc';
 import { buildExport, parseImport } from '../src/domain/jsonio';
 import type { ResultItem, SizingResult } from '../src/domain/result';
 import { emptySimple, sampleSimple, simpleToSizingInput, type SimpleInput } from '../src/domain/simple';
-import { buildSimpleView } from '../src/domain/simpleView';
+import { buildSimpleView, isSimpleOpenItem } from '../src/domain/simpleView';
 import { vmMemOverheadMiB } from '../src/domain/calc/vm';
 
 const NOW = new Date('2026-11-25T00:00:00Z');
@@ -96,5 +96,21 @@ describe('簡易版', () => {
     expect(back.mode).toBe('simple');
     expect(back.simple).toEqual(s);
     expect(back.input).toEqual(simpleToSizingInput(s));
+  });
+
+  it('確認事項には簡易版で尋ねない候補仕様や実測値の「未入力」を出さない', () => {
+    const { result } = run(sampleSimple());
+    const ids = result.openItems.filter((o) => isSimpleOpenItem(o.itemId)).map((o) => o.itemId);
+    expect(ids).not.toContain('cp.fsync');
+    expect(ids.some((id) => id.includes('.install.'))).toBe(false);
+    // 物理容量はスナップショット・空き容量を含まないため未確認として残る
+    expect(ids).toContain('storage.simple-storage.physical');
+  });
+
+  it('プリセットの VM はサンプルでも扱える', () => {
+    const s = sampleSimple();
+    expect(s.vms.some((v) => v.id === 'preset-s')).toBe(true);
+    const { errors } = run(s);
+    expect(errors).toEqual([]);
   });
 });

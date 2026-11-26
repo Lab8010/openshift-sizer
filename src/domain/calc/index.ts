@@ -290,6 +290,7 @@ function openItems(groups: SizingResult['groups']): OpenItem[] {
         seen.add(key);
         out.push({
           groupId: g.id,
+          itemId: it.id,
           sectionTitle: `${g.title} › ${s.title}`,
           label: it.label,
           status: it.status,

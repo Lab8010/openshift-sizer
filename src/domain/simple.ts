@@ -57,7 +57,7 @@ export function emptySimpleVm(id = newId('vm')): SimpleVm {
 export function emptySimple(): SimpleInput {
   return {
     projectName: '',
-    vms: [emptySimpleVm()],
+    vms: [],
     servers: { count: '', cpu: '', ram: { raw: '', unit: 'GiB' } },
     cpuRatio: '1',
     tolerance: '1',
@@ -73,8 +73,8 @@ export function sampleSimple(): SimpleInput {
   return {
     projectName: 'サンプル案件：簡易見積もり',
     vms: [
-      { id: 'svm-web', name: 'Web サーバー', count: '30', vcpu: '2', ram: { raw: '4', unit: 'GiB' }, disk: { raw: '60', unit: 'GiB' } },
-      { id: 'svm-app', name: 'アプリケーション', count: '20', vcpu: '4', ram: { raw: '16', unit: 'GiB' }, disk: { raw: '120', unit: 'GiB' } },
+      { id: 'preset-s', name: 'S（2 vCPU・4 GiB）', count: '30', vcpu: '2', ram: { raw: '4', unit: 'GiB' }, disk: { raw: '60', unit: 'GiB' } },
+      { id: 'preset-m', name: 'M（4 vCPU・16 GiB）', count: '20', vcpu: '4', ram: { raw: '16', unit: 'GiB' }, disk: { raw: '120', unit: 'GiB' } },
       { id: 'svm-db', name: 'データベース', count: '6', vcpu: '8', ram: { raw: '64', unit: 'GiB' }, disk: { raw: '500', unit: 'GiB' } },
     ],
     servers: { count: '5', cpu: '64', ram: { raw: '512', unit: 'GiB' } },
@@ -165,7 +165,7 @@ export function parseSimple(v: unknown): SimpleInput | null {
   const namespaces = str(v, 'namespaces');
   const storageFactor = str(v, 'storageFactor');
   if (projectName === null || namespaces === null || storageFactor === null) return null;
-  if (!Array.isArray(v.vms) || !v.vms.length) return null;
+  if (!Array.isArray(v.vms)) return null;
   const vms: SimpleVm[] = [];
   for (const [i, x] of (v.vms as unknown[]).entries()) {
     if (!isObj(x)) return null;
@@ -211,3 +211,45 @@ export function parseSimple(v: unknown): SimpleInput | null {
 export function simpleHasContent(s: SimpleInput): boolean {
   return s.vms.some((v) => v.name || v.count || v.vcpu || v.ram.raw || v.disk.raw) || !!s.servers.count || !!s.servers.cpu;
 }
+
+// ---- 簡易版のプリセット（このアプリの目安サイズ。公式値ではない） ----
+
+export interface VmPreset {
+  key: string;
+  label: string;
+  vcpu: string;
+  ramGiB: string;
+  diskGiB: string;
+  example: string;
+}
+
+export const VM_PRESETS: VmPreset[] = [
+  { key: 's', label: 'S', vcpu: '2', ramGiB: '4', diskGiB: '60', example: '踏み台、小さな Web サーバー、DNS など' },
+  { key: 'm', label: 'M', vcpu: '4', ramGiB: '16', diskGiB: '120', example: '一般的な業務アプリケーション、AP サーバー' },
+  { key: 'l', label: 'L', vcpu: '8', ramGiB: '32', diskGiB: '250', example: '中規模の DB、バッチ処理' },
+  { key: 'xl', label: 'XL', vcpu: '16', ramGiB: '64', diskGiB: '500', example: '大きな DB、分析処理' },
+];
+
+export const presetVmId = (key: string) => `preset-${key}`;
+
+export interface ServerPreset {
+  key: string;
+  cpu: string;
+  ramGiB: string;
+  example: string;
+}
+
+export const SERVER_PRESETS: ServerPreset[] = [
+  { key: 'c32', cpu: '32', ramGiB: '256', example: '1 ソケット 16 コア（HT 有効）程度' },
+  { key: 'c64', cpu: '64', ramGiB: '512', example: '2 ソケット × 16 コア（HT 有効）程度' },
+  { key: 'c96', cpu: '96', ramGiB: '768', example: '2 ソケット × 24 コア（HT 有効）程度' },
+  { key: 'c128', cpu: '128', ramGiB: '1024', example: '2 ソケット × 32 コア（HT 有効）程度' },
+];
+
+/** 規模（Namespace 数）の選択肢。値は公式試験表の Namespace 数の区切り */
+export const SCALE_OPTIONS = [
+  { value: '500', label: '小規模（Namespace 500 以下）', example: 'VM と少数のアプリだけを載せる、部門単位のクラスタ' },
+  { value: '1000', label: '中規模（Namespace 1,000 以下）', example: '複数チームで共有するクラスタ' },
+  { value: '4000', label: '大規模（Namespace 4,000 以下）', example: '全社共通基盤として多数のプロジェクトを載せる' },
+  { value: '', label: '分からない', example: '利用者や用途がまだ決まっていない' },
+] as const;

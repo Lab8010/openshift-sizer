@@ -12,13 +12,50 @@ export interface SimpleRow {
   refs?: string[];
 }
 
+export interface SimpleCard {
+  title: string;
+  value: string;
+  sub: string;
+  status?: Status;
+}
+
+export interface SimpleReason {
+  title: string;
+  text: string;
+}
+
 export interface SimpleView {
   verdict: { status: Status; headline: string; details: string[] };
+  /** 結論のすぐ下に並べる 3 ロールの台数と 1 台あたりの目安 */
+  cards: SimpleCard[];
+  /** なぜこの台数か */
+  reasons: SimpleReason[];
   sections: { title: string; rows: SimpleRow[] }[];
 }
 
 /** 簡易版で結果を表示するグループ（ネットワーク・サービス等は詳細版で扱う） */
 export const SIMPLE_GROUP_IDS = ['vm', 'compute', 'controlPlane', 'infra', 'storage', 'bootstrap'];
+
+/** 簡易版の確認事項に出す項目（簡易版で尋ねない候補仕様などの「未入力」は出さない） */
+export function isSimpleOpenItem(itemId: string): boolean {
+  return (
+    /^vmTotal\./.test(itemId) ||
+    /^vm\.[^.]+\.(cpuReq|memPerVm|diskTotal|limits)$/.test(itemId) ||
+    /^compute\.(required|scNormal|scFail|scDrain|candMin|vmCpuPerNode|vmMemPerNode|limitHosts|limitVms)$/.test(itemId) ||
+    /^(cp|infra)\.scaleRow$/.test(itemId) ||
+    /^storage\.[^.]+\.physical$/.test(itemId)
+  );
+}
+
+/** 簡易版では入力しないが、導入前に実環境で確かめること（公式資料の確認項目） */
+export const SIMPLE_CHECKLIST: { text: string; refs: string[] }[] = [
+  { text: 'etcd を置くディスクの p99 fsync が 10 ms 未満、etcd メンバー間の p99 RTT が 50 ms 未満であること', refs: ['etcdFsyncP99', 'etcdRttP99'] },
+  { text: 'コントロールプレーンの平常時の CPU・メモリ使用率が 60% 以下に収まること（大規模・高密度の 3 台構成）', refs: ['cpUtilGuideline'] },
+  { text: 'ライブマイグレーションさせる VM のディスクが RWX（ReadWriteMany）の共有ストレージにあり、ノード間で CPU に互換性があること', refs: ['migration'] },
+  { text: 'ライブマイグレーション用に専用の Multus ネットワークを用意すること（強い推奨）', refs: ['migration'] },
+  { text: 'VM を動かす Worker が RHCOS で、CPU の仮想化拡張が有効なこと', refs: ['rhcos', 'platforms'] },
+  { text: '共有ストレージの性能（IOPS・スループット・レイテンシ）と、ネットワーク帯域が足りること（詳細入力で確かめられます）', refs: ['storage'] },
+];
 
 const pct = (v: number) => `${fmt(Math.round(v * 10) / 10)} %`;
 
@@ -200,8 +237,66 @@ export function buildSimpleView(simple: SimpleInput, result: SizingResult): Simp
     },
   ];
 
+  // ---- カード ----
+  const cards: SimpleCard[] = [
+    {
+      title: 'VM 用の物理サーバ',
+      value: f.computeCandidate !== null ? `${fmt(f.computeCandidate)} 台（必要 ${reqText}）` : `必要 ${reqText}`,
+      sub: `${simple.servers.cpu || '—'} 論理コア・${simple.servers.ram.raw || '—'} ${simple.servers.ram.unit}／台、停止許容 ${tol} 台`,
+      status: f.computeCandidate !== null ? f.computeCandidateStatus : f.computeRequiredStatus,
+    },
+    {
+      title: 'コントロールプレーン',
+      value: `${OFFICIAL.installCpCount.value} 台 × ${fmt(f.cpPerNodeCpu)} コア・${fmt(f.cpPerNodeMemGB)} GB 以上`,
+      sub: cpRow ? `公式試験の参考点（${fmt(cpRow.namespaces)} Namespace）とインストール最低要件から` : f.cpRowStatus === 'individual' ? '公式試験の範囲外のため要個別評価' : 'インストール最低要件から',
+      status: f.cpRowStatus === 'individual' ? 'individual' : undefined,
+    },
+    f.infraEnabled
+      ? {
+          title: 'インフラノード',
+          value:
+            f.infraPerNodeGuideCpu !== null && f.infraPerNodeGuideMemMiB !== null
+              ? `${OFFICIAL.infraRecommendedCount.value} 台 × ${fmt(f.infraPerNodeGuideCpu)} コア・${fmt(f.infraPerNodeGuideMemMiB / 1024)} GiB 目安`
+              : `${OFFICIAL.infraRecommendedCount.value} 台`,
+          sub:
+            f.infraPerNodeGuideCpu !== null
+              ? '公式試験の参考サイズ + Virtualization のインフラ分'
+              : f.infraRowStatus === 'individual'
+                ? '公式試験の範囲外のため要個別評価'
+                : '規模（Namespace 数）を選ぶと 1 台あたりの目安を表示',
+          status: f.infraRowStatus === 'individual' ? 'individual' : f.infraPerNodeGuideCpu === null ? 'not_calculated' : undefined,
+        }
+      : { title: 'インフラノード', value: '分けない', sub: 'Virtualization のインフラ分は VM 用サーバに含めて計算', status: 'na' },
+  ];
+
+  // ---- なぜこの台数か ----
+  const reasons: SimpleReason[] = [];
+  if (f.totalCpuDemand !== null && f.vmCpuPerNode) {
+    reasons.push({
+      title: `CPU から ${fmt(Math.ceil(f.totalCpuDemand / f.vmCpuPerNode - 1e-9))} 台`,
+      text: `CPU 要求量 ${fmt(f.totalCpuDemand)} コア ÷ 1 台で VM に使える ${fmt(f.vmCpuPerNode)} コア（割り当て比率 ${simple.cpuRatio}:1）`,
+    });
+  }
+  if (f.totalMemDemandMiB !== null && f.vmMemPerNodeMiB) {
+    reasons.push({
+      title: `メモリから ${fmt(Math.ceil(f.totalMemDemandMiB / f.vmMemPerNodeMiB - 1e-9))} 台`,
+      text: `メモリ要求量 ${fmt(f.totalMemDemandMiB / 1024)} GiB ÷ 1 台で VM に使える ${fmt(f.vmMemPerNodeMiB / 1024)} GiB（VM の追加メモリを含む）`,
+    });
+  }
+  if (required !== null) {
+    reasons.push({
+      title: tol > 0 ? `${tol} 台止まっても載るように ${reqText}` : `最少台数を満たして ${reqText}`,
+      text:
+        tol > 0
+          ? `残り ${fmt(Math.max(required - tol, 0))} 台にすべての VM が載り、ライブマイグレーション用の予備メモリも確保できる最小の台数（コンピュートは最低 ${OFFICIAL.installComputeCount.value} 台）`
+          : `CPU とメモリの両方が足り、すべての VM を配置できる最小の台数（コンピュートは最低 ${OFFICIAL.installComputeCount.value} 台）`,
+    });
+  }
+
   return {
     verdict: { status, headline, details },
+    cards,
+    reasons,
     sections: [
       { title: 'VM の合計', rows: vmRows },
       { title: 'VM 用の物理サーバ（コンピュートノード）', rows: capRows },

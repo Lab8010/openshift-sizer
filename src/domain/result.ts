@@ -132,6 +132,7 @@ export interface SummaryRow {
 
 export interface OpenItem {
   groupId: string;
+  itemId: string;
   sectionTitle: string;
   label: string;
   status: Status;
